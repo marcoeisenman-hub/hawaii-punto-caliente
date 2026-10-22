@@ -136,7 +136,7 @@ import { OrbitControls } from './vendor/OrbitControls.js';
 import { Sky } from './vendor/Sky.js';
 
 /* ---------- Mundo (unidades: 1 = ~280 m de altura) ---------- */
-const V = 24;                 // velocidad de la placa (unidades / millón de años)
+const V = 28;                 // velocidad de la placa (unidades / millón de años)
 const HX = 60, HZ = 4;        // punto caliente (fijo)
 const PLUMA_R = 16;
 const MAR = 0, FONDO = -14;
@@ -149,17 +149,18 @@ const ZC = 6;                 // plano de corte
 
 /* volcanes: tB = nace, crece = duración sobre el punto caliente */
 const VOLCANES = [
-  { n:'Niʻihau',            tB:-6.6, crece:1.0, H:20, w:11, z:-15, ero:.9, sink:.55 },
-  { n:'Kauaʻi',             tB:-5.4, crece:1.1, H:26, w:14, z:-11, ero:1.0, sink:.7, q:0 },
-  { n:'Oʻahu',              tB:-3.5, crece:1.0, H:24, w:13, z:-6,  ero:1.0, sink:.7, q:1 },
-  { n:'Molokaʻi',           tB:-2.5, crece:.9,  H:21, w:10, z:-1,  ero:1.0, sink:.7 },
-  { n:'Maui',               tB:-1.75,crece:.9,  H:25, w:12, z:2,   ero:1.0, sink:.7, q:2 },
-  { n:'Isla de Hawái',      tB:-0.85,crece:.85, H:29, w:17, z:6,   ero:1.0, sink:.7, q:3 },
-  { n:'Kamaʻehuakanaloa',   tB:-0.26,crece:.26, H:10.5, w:7, z:10, ero:0, sink:0, q:4, sub:true },
+  { n:'Niʻihau',            tB:-6.6, crece:1.0, H:19, w:11, z:-17, ero:.7, sink:.42 },
+  { n:'Kauaʻi',             tB:-5.4, crece:1.1, H:25, w:15, z:-11, ero:.62, sink:.4, q:0 },
+  { n:'Oʻahu',              tB:-3.5, crece:1.0, H:23.5, w:14, z:-4,  ero:.7, sink:.45, q:1 },
+  { n:'Molokaʻi',           tB:-2.5, crece:.9,  H:20, w:10, z:-3,  ero:.8, sink:.5 },
+  { n:'Maui',               tB:-1.75,crece:.9,  H:24.5, w:13, z:3,   ero:.8, sink:.5, q:2 },
+  { n:'Isla de Hawái',      tB:-0.85,crece:.85, H:27.5, w:18, z:9,   ero:.8, sink:.5, q:3 },
+  { n:'Kamaʻehuakanaloa',   tB:-0.26,crece:.26, H:10.5, w:8, z:16, ero:0, sink:0, q:4, sub:true },
 ];
 // rejuvenecimiento de Oʻahu (como el que formó Diamond Head)
 const REJUV = { de:'Oʻahu', t:-0.55, dur:.12, H:2.2, w:2.2, dx:7, dz:3 };
 
+VOLCANES.forEach((v,q)=>{ v.seed = q*7.31+2; v.nv = 11 + (q%3)*3; });
 for (const v of VOLCANES){ v.lx = HX + V*v.tB; v.emergio = false; v.salio = false; v.erosiono = false; }
 
 /* ---------- Ruido ---------- */
@@ -226,16 +227,22 @@ controls.minDistance = 25; controls.maxDistance = 330; controls.maxPolarAngle = 
 const sky = new Sky(); sky.scale.setScalar(4000); scene.add(sky);
 const su = sky.material.uniforms;
 su.turbidity.value = 2.2; su.rayleigh.value = 1.1; su.mieCoefficient.value = .004; su.mieDirectionalG.value = .85;
-const sol = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(58), THREE.MathUtils.degToRad(200));
+const sol = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(64), THREE.MathUtils.degToRad(215));
 su.sunPosition.value.copy(sol);
 const pmrem = new THREE.PMREMGenerator(renderer);
 const skyScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(4000); sky2.material.uniforms.sunPosition.value.copy(sol);
 for (const k of ['turbidity','rayleigh','mieCoefficient','mieDirectionalG']) sky2.material.uniforms[k].value = su[k].value;
 skyScene.add(sky2);
 scene.environment = pmrem.fromScene(skyScene).texture;
-scene.fog = new THREE.Fog(0x9fb9cf, 260, 900);
+scene.fog = new THREE.Fog(0x9fb9cf, 320, 1100);
 
-const luzSol = new THREE.DirectionalLight(0xfff1dc, 2.4); luzSol.position.copy(sol).multiplyScalar(200); scene.add(luzSol);
+const luzSol = new THREE.DirectionalLight(0xffeccc, 2.7); luzSol.position.copy(sol).multiplyScalar(220); scene.add(luzSol); scene.add(luzSol.target);
+const movil = Math.min(innerWidth, innerHeight) < 700;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+luzSol.castShadow = true; luzSol.shadow.mapSize.set(movil?1024:2048, movil?1024:2048);
+Object.assign(luzSol.shadow.camera, { left:-150, right:150, top:110, bottom:-110, near:10, far:520 });
+luzSol.shadow.bias = -.0006; luzSol.shadow.normalBias = .6;
+luzSol.target.position.set(-35, 0, 0); luzSol.position.add(luzSol.target.position);
 scene.add(new THREE.HemisphereLight(0xcfe3f5, 0x3a3a34, .55));
 
 /* plano de corte */
@@ -255,41 +262,90 @@ geo.setAttribute('aGlow', new THREE.BufferAttribute(glow,1));
 const vi = new Int32Array(NV), vj = new Int32Array(NV);
 for (let k=0;k<NV;k++){ vi[k]=Math.round((pos.getX(k)-X_MIN)/DX); vj[k]=Math.round((pos.getZ(k)-Z_MIN)/DZ); }
 
-const matTerreno = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:.93, metalness:0, envMapIntensity:.6, clippingPlanes:sinCorte, side:THREE.DoubleSide });
+function texturasRoca(){
+  const S=256, alt=new Float32Array(S*S);
+  for (let j=0;j<S;j++) for (let i=0;i<S;i++){ let v=0,a=1,f=8; for(let o=0;o<5;o++){ v+=a*vnoiseT(i/S*f,j/S*f,f); a*=.5; f*=2; } alt[j*S+i]=v; }
+  const cA=document.createElement('canvas'); cA.width=cA.height=S; const xA=cA.getContext('2d'), iA=xA.createImageData(S,S);
+  const cN=document.createElement('canvas'); cN.width=cN.height=S; const xN=cN.getContext('2d'), iN=xN.createImageData(S,S);
+  for (let j=0;j<S;j++) for (let i=0;i<S;i++){
+    const p=(j*S+i)*4, v=alt[j*S+i], g=Math.round(228+ (v-.95)*120);
+    iA.data[p]=iA.data[p+1]=iA.data[p+2]=Math.max(140,Math.min(255,g)); iA.data[p+3]=255;
+    const l=alt[j*S+(i-1+S)%S], r=alt[j*S+(i+1)%S], u=alt[((j-1+S)%S)*S+i], d=alt[((j+1)%S)*S+i];
+    const nx=(l-r)*3, ny=(u-d)*3, L=Math.hypot(nx,ny,1);
+    iN.data[p]=(nx/L*.5+.5)*255; iN.data[p+1]=(ny/L*.5+.5)*255; iN.data[p+2]=(1/L*.5+.5)*255; iN.data[p+3]=255;
+  }
+  xA.putImageData(iA,0,0); xN.putImageData(iN,0,0);
+  const a=new THREE.CanvasTexture(cA), n=new THREE.CanvasTexture(cN);
+  for (const t of [a,n]){ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(26,13); t.anisotropy=4; }
+  a.colorSpace = THREE.SRGBColorSpace;
+  return [a,n];
+}
+const [texRoca, texRocaN] = texturasRoca();
+const matTerreno = new THREE.MeshStandardMaterial({ vertexColors:true, map:texRoca, normalMap:texRocaN, normalScale:new THREE.Vector2(.9,.9), roughness:.95, metalness:0, envMapIntensity:.5, clippingPlanes:sinCorte, side:THREE.DoubleSide });
 matTerreno.onBeforeCompile = (sh)=>{
-  sh.uniforms.uT = uT;
+  sh.uniforms.uT = uT; sh.uniforms.uLava = uLava; sh.uniforms.uPlaca = uPlaca;
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aGlow; varying float vGlow; varying vec3 vWp;')
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = aGlow; vWp = (modelMatrix*vec4(position,1.)).xyz;');
-  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vGlow; varying vec3 vWp; uniform float uT;')
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+    varying float vGlow; varying vec3 vWp; uniform float uT; uniform vec4 uLava; uniform float uPlaca;
+    float hL(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+    float nL(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(hL(i),hL(i+vec2(1,0)),f.x),mix(hL(i+vec2(0,1)),hL(i+vec2(1,1)),f.x),f.y); }`)
     .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-      float fl = .75 + .25*sin(uT*6. + vWp.x*.9 + vWp.z*1.3);
-      totalEmissiveRadiance += vec3(1.0,.30,.04) * vGlow * 4.5 * fl;`);
+      float fl = .8 + .2*sin(uT*5. + vWp.x*.9 + vWp.z*1.3);
+      float lava = vGlow;
+      if (uLava.w > .5){
+        vec2 d = vWp.xz - uLava.xy; float r = length(d)/uLava.z; float a = atan(d.y, d.x);
+        vec2 pl = vec2(vWp.x + uPlaca, vWp.z);
+        float m = nL(pl*.35)*2.4 + nL(pl*1.3)*.6;
+        float rio = pow(max(0., cos(a*4. + m + r*2.2)), 70.) + pow(max(0., cos(a*7. + m*1.4 - r*3.)), 120.)*.7;
+        float largo = 1. - smoothstep(.55, 1.0, r + nL(pl*.5)*.25);
+        float cima = 1. - smoothstep(.04, .09, r);
+        float tierra = step(.15, vWp.y);
+        lava = max(lava*.4, (rio*largo*step(.05,r) + cima) * tierra);
+        diffuseColor.rgb *= 1. - .6*smoothstep(.0,.3,rio*largo);   // costra negra junto a los ríos
+      }
+      totalEmissiveRadiance += vec3(1.0,.27,.03) * lava * 3.4 * fl + vec3(1.,.6,.2)*pow(lava,3.)*1.5;`);
 };
-const uT = { value:0 };
+const uT = { value:0 }, uLava = { value:new THREE.Vector4(0,0,1,0) }, uPlaca = { value:0 };
 const terreno = new THREE.Mesh(geo, matTerreno);
+terreno.castShadow = true; terreno.receiveShadow = true;
 scene.add(terreno);
 
 const vols = VOLCANES;
 let estados = [];
+let _carve = 0;   // cuánto talló la erosión el último punto (para el color)
 function alturaEn(x, z, j, t, est){
   const lx = x + V*t;
   let y = FONDO + sampleG(baseG, lx, j);
+  const rg = sampleG(rugG, lx, j);
+  _carve = 0;
   for (let q=0;q<vols.length;q++){
     const v = vols[q], e = est[q]; if (e.edad < 0) continue;
-    const w = v.w * (1 + e.ero*.25);
-    const dx = x - e.x; if (dx > w*2.6 || dx < -w*2.6) continue;
-    const dz = z - v.z; if (dz > w*2.6 || dz < -w*2.6) continue;
-    const r2 = (dx*dx+dz*dz)/(w*w);
-    const f = Math.exp(-r2*1.15);
+    const w = v.w * (1 + e.ero*.18);
+    const dx = x - e.x; if (dx > w*3 || dx < -w*3) continue;
+    const dz = z - v.z; if (dz > w*3 || dz < -w*3) continue;
+    const r = Math.sqrt(dx*dx+dz*dz)/w;
+    // perfil de volcán escudo: ancho, pendiente suave, flancos submarinos más largos
+    const f = Math.exp(-Math.pow(r,2.1)*.95);
     let h = e.h*f;
-    const rg = sampleG(rugG, lx, j);
-    h *= 1 - (.07 + e.ero*.55)*rg*Math.min(1, r2*3);
-    if (e.activo && e.h > 8) h -= e.h*.05*Math.exp(-r2*40);         // caldera
+    // valles radiales de erosión (como los cañones de Kauaʻi)
+    let carve = .045*rg;
+    if (e.ero > 0){
+      const a = Math.atan2(dz, dx);
+      const wob = vnoise(a*2.2 + v.seed, r*2.6 + v.seed)*3.2;
+      const sn = Math.abs(Math.sin(a*v.nv*.5 + wob + r*1.3));
+      const banda = Math.min(1, Math.max(0, (r-.08)/.35)) * (1 - Math.min(1, Math.max(0, (r-1.05)/.6)));
+      const valle = Math.pow(1-sn, 3.2);
+      const c = e.ero*banda*(.62*valle + .22*rg);
+      carve += c; if (c > _carve) _carve = c;
+    }
+    h *= 1 - carve;
+    if (e.activo && e.h > 8) h -= e.h*.045*Math.exp(-r*r*55);        // caldera en la cima
     y += h - e.sink*f;
   }
-  // rejuvenecimiento: conito en Oʻahu
+  // rejuvenecimiento: cono de toba en Oʻahu (como Diamond Head)
   const rj = rejuvEstado(t);
-  if (rj){ const dx=x-rj.x, dz=z-rj.z, r2=(dx*dx+dz*dz)/(REJUV.w*REJUV.w); y += rj.h*Math.exp(-r2*1.6) - rj.h*.5*Math.exp(-r2*12); }
+  if (rj){ const dx=x-rj.x, dz=z-rj.z, r2=(dx*dx+dz*dz)/(REJUV.w*REJUV.w); y += rj.h*Math.exp(-r2*1.6) - rj.h*.6*Math.exp(-r2*10); }
   return y;
 }
 function rejuvEstado(t){
@@ -299,10 +355,15 @@ function rejuvEstado(t){
   return { x:e.x+REJUV.dx, z:o.z+REJUV.dz, h:REJUV.H*s - (e.sink)*0, activo: s<1 };
 }
 
-const cBasaltoJ = new THREE.Color(.075,.07,.068), cBasaltoV = new THREE.Color(.16,.145,.13), cVerde = new THREE.Color(.11,.24,.07),
-      cVerde2 = new THREE.Color(.2,.31,.1), cTierra = new THREE.Color(.36,.22,.13), cArena = new THREE.Color(.72,.64,.47), cArenaN = new THREE.Color(.09,.085,.08),
-      cFondo = new THREE.Color(.17,.2,.21), cSub = new THREE.Color(.2,.19,.18);
-const tmp = new THREE.Color();
+const C = (r,g,b)=>new THREE.Color(r,g,b);
+const cLavaNueva = C(.035,.032,.03), cBasaltoV = C(.12,.105,.095), cCeniza = C(.2,.1,.07), cVerdeH = C(.035,.12,.025), cVerdeH2 = C(.06,.16,.035),
+      cSeco = C(.3,.24,.12), cSeco2 = C(.22,.19,.1), cRoja = C(.34,.12,.05), cArena = C(.62,.55,.4), cArenaN = C(.05,.05,.048),
+      cFondo = C(.17,.2,.21), cSub = C(.13,.12,.115);
+const tmp = new THREE.Color(), tmp2 = new THREE.Color();
+const prof = new Uint8Array((NX+1)*(NZ+1));
+const profTex = new THREE.DataTexture(prof, NX+1, NZ+1, THREE.RedFormat, THREE.UnsignedByteType);
+profTex.magFilter = profTex.minFilter = THREE.LinearFilter; profTex.unpackAlignment = 1; profTex.needsUpdate = true;
+const sat = (x)=>x<0?0:x>1?1:x;
 let frameN = 0;
 function actualizarTerreno(t, normales){
   estados = vols.map(v=>estado(v,t));
@@ -310,44 +371,59 @@ function actualizarTerreno(t, normales){
   const rj = rejuvEstado(t);
   for (let k=0;k<NV;k++){
     const x = pos.getX(k), z = pos.getZ(k), j = vj[k];
-    const y = alturaEn(x, z, j, t, est);
+    let y = alturaEn(x, z, j, t, est);
+    const carve = _carve;
     const borde = Math.min(1, Math.min(x-X_MIN, X_MAX-x, z-Z_MIN, Z_MAX-z)/14);
-    pos.setY(k, borde<1 ? (FONDO-1.6)+(y-(FONDO-1.6))*borde : y);
+    if (borde<1) y = (FONDO-1.6)+(y-(FONDO-1.6))*borde;
+    pos.setY(k, y);
+    prof[vj[k]*(NX+1)+vi[k]] = Math.round(sat(-y/8)*255);
     // volcán dominante
     let dom=-1, best=0, rdom=9;
     for (let q=0;q<vols.length;q++){
       const e=est[q]; if (e.edad<0) continue;
-      const v=vols[q], dx=x-e.x, dz=z-v.z, r2=(dx*dx+dz*dz)/(v.w*v.w), f=Math.exp(-r2*1.15)*e.h;
-      if (f>best){best=f;dom=q;rdom=Math.sqrt(r2);}
+      const v=vols[q], dx=x-e.x, dz=z-v.z, r=Math.sqrt(dx*dx+dz*dz)/v.w, f=Math.exp(-Math.pow(r,2.1)*.95)*e.h;
+      if (f>best){best=f;dom=q;rdom=r;}
     }
-    const lx = x+V*t, n = sampleG(rugG, lx, j);
+    const lx = x+V*t, n = sampleG(rugG, lx, j), n2 = sampleG(baseG, lx*1.7, j);
     let g = 0;
-    if (y > MAR + .45){
+    if (y > MAR + .35){
       if (dom>=0){
         const e = est[dom], v = vols[dom];
         const edadPico = t - (v.tB+v.crece);
-        const veg = Math.max(0, Math.min(1, (edadPico+.25)/1.1)) * (1 - Math.max(0,Math.min(1,(y-9.5)/4)));
-        tmp.copy(cBasaltoJ).lerp(cBasaltoV, Math.max(0,Math.min(1,edadPico/.8)));
-        tmp.lerp(n>.45?cVerde:cVerde2, veg*.95);
-        if (e.ero>.3) tmp.lerp(cTierra, (n>.7?.55:0)*e.ero);
+        const joven = e.activo || edadPico < .15;
+        // roca: lava fresca negra → basalto gris pardo con el tiempo
+        tmp.copy(cLavaNueva).lerp(cBasaltoV, sat((edadPico+.1)/.9));
+        if (!joven){
+          // lado del viento (lluvioso) verde; lado contrario seco
+          const barlo = sat(.5 + (z - v.z)/(v.w*1.2));
+          const altura = 1 - sat((y-8.5)/4.5);
+          const veg = sat((edadPico+.05)/.9) * altura;
+          tmp2.copy(n>.5?cVerdeH:cVerdeH2).lerp(n2>.1?cSeco:cSeco2, 1-barlo);
+          tmp.lerp(tmp2, veg*(.55+.45*barlo));
+          // paredes de los cañones: tierra roja
+          tmp.lerp(cRoja, sat(carve*3.2 - .15)*sat(edadPico/1.2));
+        }
+        // cimas altas: ceniza rojiza sin plantas
+        tmp.lerp(cCeniza, sat((y-10)/4)*.8);
         // ríos de lava en volcanes activos sobre el mar
         if (e.activo && e.cima > MAR){
           const ang = Math.atan2(z-v.z, x-e.x);
-          const rio = Math.pow(Math.max(0, Math.cos(ang*5 + vnoise(rdom*3,ang*2)*3 + v.tB*7)), 26);
-          g = (rdom<.14 ? .9 : 0) + rio * Math.max(0, 1 - rdom/1.0) * (rdom>.12?1:0);
+          const rio = Math.pow(Math.max(0, Math.cos(ang*4 + vnoise(rdom*3,ang*2)*3 + v.tB*7)), 90)*.8;
+          g = 0; tmp.lerp(cLavaNueva, .6);
         }
       } else tmp.copy(cBasaltoV);
-    } else if (y > MAR - .2){
+    } else if (y > MAR - .25){
       const joven = dom>=0 && (t-(vols[dom].tB+vols[dom].crece)) < .4;
       tmp.copy(joven?cArenaN:cArena);
     } else {
-      const prof = Math.max(0, Math.min(1, (MAR - y)/(MAR - FONDO)));
-      tmp.copy(dom>=0 && best>1 ? cSub : cFondo).lerp(cArena, Math.max(0, .5 - prof*3));
+      const p = sat((MAR - y)/(MAR - FONDO));
+      tmp.copy(dom>=0 && best>1 ? cSub : cFondo).lerp(cArena, Math.max(0, .55 - p*4));
     }
     if (rj && rj.activo){ const dx=x-rj.x, dz=z-rj.z; if (dx*dx+dz*dz < 2.2) g = .9; }
-    col[k*3]=tmp.r; col[k*3+1]=tmp.g; col[k*3+2]=tmp.b;
+    col[k*3]=tmp.r*1.3; col[k*3+1]=tmp.g*1.3; col[k*3+2]=tmp.b*1.3;
     glow[k]=g;
   }
+  profTex.needsUpdate = true;
   pos.needsUpdate = true; geo.attributes.color.needsUpdate = true; geo.attributes.aGlow.needsUpdate = true;
   if (normales) geo.computeVertexNormals();
 }
@@ -384,6 +460,26 @@ const matMar = new THREE.MeshPhysicalMaterial({ color:0x04314a, roughness:.06, m
 // fondo marino lejano (para que no se vea el borde)
 const fondoLejos = new THREE.Mesh(new THREE.PlaneGeometry(2400,2400), new THREE.MeshStandardMaterial({ color:new THREE.Color().setRGB(.17,.2,.21), roughness:.93, envMapIntensity:.6, clippingPlanes:sinCorte }));
 fondoLejos.rotation.x = -Math.PI/2; fondoLejos.position.y = FONDO-1.6; scene.add(fondoLejos);
+matMar.onBeforeCompile = (sh)=>{
+  sh.uniforms.uProf = { value: profTex }; sh.uniforms.uT = uT;
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vMarW;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMarW = (modelMatrix*vec4(position,1.)).xyz;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+    varying vec3 vMarW; uniform sampler2D uProf; uniform float uT;
+    float hM(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+    float nM(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(hM(i),hM(i+vec2(1,0)),f.x),mix(hM(i+vec2(0,1)),hM(i+vec2(1,1)),f.x),f.y); }`)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      vec2 uvp = (vMarW.xz - vec2(${X_MIN.toFixed(1)}, ${Z_MIN.toFixed(1)})) / vec2(${(X_MAX-X_MIN).toFixed(1)}, ${(Z_MAX-Z_MIN).toFixed(1)});
+      float dentro = step(0.,uvp.x)*step(uvp.x,1.)*step(0.,uvp.y)*step(uvp.y,1.);
+      float dep = mix(8., texture2D(uProf, uvp).r*8., dentro);
+      vec3 turquesa = vec3(.02,.32,.30), media = vec3(.012,.12,.16);
+      diffuseColor.rgb = mix(turquesa, mix(media, diffuseColor.rgb, smoothstep(2.,7.,dep)), smoothstep(.0,2.2,dep));
+      diffuseColor.a = mix(.42, diffuseColor.a, smoothstep(.0,3.5,dep));
+      float ola = nM(vMarW.xz*1.6 + vec2(uT*.6, uT*.35)) * .6 + nM(vMarW.xz*4.1 - uT*.8)*.4;
+      float espuma = (1.-smoothstep(.0,.55 + .25*sin(uT*1.7 + vMarW.x*.4), dep)) * step(.002, dep) * smoothstep(.35,.65, ola);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.9,.93,.95), espuma*.85);
+      diffuseColor.a = max(diffuseColor.a, espuma*.95);`);
+};
 const mar = new THREE.Mesh(new THREE.PlaneGeometry(2400,2400), matMar);
 mar.rotation.x = -Math.PI/2; mar.position.y = MAR; mar.renderOrder = 2;
 scene.add(mar);
@@ -464,6 +560,31 @@ function texRadial(stops){
 }
 const texHumo = texRadial([[0,'rgba(255,255,255,.55)'],[.5,'rgba(255,255,255,.22)'],[1,'rgba(255,255,255,0)']]);
 const texBrillo = texRadial([[0,'rgba(255,220,150,1)'],[.25,'rgba(255,120,30,.7)'],[1,'rgba(255,60,0,0)']]);
+// nubes (cúmulos de los vientos alisios) y vapor donde la lava entra al mar
+function texNube(){
+  const S=128, c=document.createElement('canvas'); c.width=c.height=S; const x=c.getContext('2d'), im=x.createImageData(S,S);
+  for (let j=0;j<S;j++) for (let i=0;i<S;i++){
+    const dx=(i-S/2)/(S/2), dy=(j-S/2)/(S/2), r=Math.sqrt(dx*dx+dy*dy);
+    let n=0,a=.5,f=3; for(let o=0;o<4;o++){ n+=a*vnoise(i/S*f*2+11, j/S*f*2+5); a*=.5; f*=2; }
+    const al = Math.max(0, Math.min(1, (1-r)*1.6)) * Math.max(0, Math.min(1, (n-.25)*2.4));
+    const p=(j*S+i)*4, sombra = 1 - Math.max(0,dy)*.28;
+    im.data[p]=im.data[p+1]=Math.round(255*sombra); im.data[p+2]=Math.round(255*Math.min(1,sombra+.03)); im.data[p+3]=Math.round(al*255);
+  }
+  x.putImageData(im,0,0); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+const texN = texNube();
+const nubes = [];
+function sprNube(op){ const m=new THREE.SpriteMaterial({ map:texN, transparent:true, depthWrite:false, opacity:op, fog:true }); const s=new THREE.Sprite(m); scene.add(s); return s; }
+for (let i=0;i<16;i++){
+  const cx = -230 + Math.random()*420, cz = -150 + Math.random()*300, cy = 30 + Math.random()*8, partes=[];
+  for (let k=0;k<4;k++){ const sp=sprNube(.82); const sc=12+Math.random()*12; sp.scale.set(sc*1.6,sc,1); partes.push({sp, ox:(Math.random()-.5)*18, oy:Math.random()*4, oz:(Math.random()-.5)*10}); }
+  nubes.push({x:cx, y:cy, z:cz, partes});
+}
+const nubesIsla = vols.map(()=>{ const ps=[]; for(let k=0;k<3;k++){ const sp=sprNube(0); sp.scale.set(20,8,1); ps.push(sp);} return ps; });
+const vapores = [];
+for (let i=0;i<26;i++){ const s=new THREE.Sprite(new THREE.SpriteMaterial({ map:texHumoV(), color:0xffffff, transparent:true, depthWrite:false, opacity:0, fog:true })); s.visible=false; scene.add(s); vapores.push(s); }
+function texHumoV(){ return texHumoV.t || (texHumoV.t = texRadial([[0,'rgba(255,255,255,.7)'],[.5,'rgba(255,255,255,.25)'],[1,'rgba(255,255,255,0)']])); }
+let costa = null, costaT = 0;
 const humos = [];
 for (let i=0;i<46;i++){
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:texHumo, color:0x8b8580, transparent:true, depthWrite:false, opacity:0, fog:true }));
@@ -471,7 +592,7 @@ for (let i=0;i<46;i++){
 }
 const brillo = new THREE.Sprite(new THREE.SpriteMaterial({ map:texBrillo, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true }));
 brillo.scale.set(10,10,1); brillo.visible=false; scene.add(brillo);
-const luzLava = new THREE.PointLight(0xff5a1a, 0, 45, 1.4); scene.add(luzLava);
+const luzLava = new THREE.PointLight(0xff5a1a, 0, 22, 2); scene.add(luzLava);
 const NS = 140, chG = new THREE.BufferGeometry(), chP = new Float32Array(NS*3), chV = new Float32Array(NS*3), chL = new Float32Array(NS);
 chG.setAttribute('position', new THREE.BufferAttribute(chP,3));
 const chispas = new THREE.Points(chG, new THREE.PointsMaterial({ color:0xffa040, size:.45, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false }));
@@ -494,10 +615,10 @@ let marcaHasta = 0;
 const labelsEl = document.getElementById('labels');
 const labIsla = vols.map(v=>{ const d=document.createElement('div'); d.className='lab isla'; d.textContent=v.n; labelsEl.appendChild(d); return d; });
 const capas = [
-  { t:'<b>Litosfera</b> · placa del Pacífico ← se mueve al noroeste', p:()=>new THREE.Vector3(X_MIN+30,(LITO_TOP+LITO_BOT)/2,ZC) },
-  { t:'<b>Corteza oceánica</b> de basalto', p:()=>new THREE.Vector3(X_MIN+30,(FONDO+LITO_TOP)/2-.5,ZC) },
-  { t:'<b>Astenosfera</b> (manto)', p:()=>new THREE.Vector3(X_MIN+30,(LITO_BOT+ASTE_BOT)/2,ZC) },
-  { t:'<b>Pluma del manto</b> · roca sólida muy caliente<br>que sube lento por convección', p:()=>new THREE.Vector3(HX-9,-78,ZC), der:true },
+  { t:'<b>Litosfera</b> · placa del Pacífico ← se mueve al noroeste', p:()=>new THREE.Vector3(HX-88,(LITO_TOP+LITO_BOT)/2,ZC) },
+  { t:'<b>Corteza oceánica</b> de basalto', p:()=>new THREE.Vector3(HX-88,(FONDO+LITO_TOP)/2-.5,ZC) },
+  { t:'<b>Astenosfera</b> (manto)', p:()=>new THREE.Vector3(HX-88,LITO_BOT-14,ZC) },
+  { t:'<b>Pluma del manto</b> · roca sólida muy caliente<br>que sube lento por convección', p:()=>new THREE.Vector3(HX-9,-88,ZC), der:true },
   { t:'<b>Punto caliente</b> (fijo) · al bajar la presión,<br>parte de la roca se funde: magma', p:()=>new THREE.Vector3(HX-24,LITO_BOT-5,ZC), der:true },
 ];
 capas.forEach(c=>{ const d=document.createElement('div'); d.className='lab capa hidden'+(c.der?' der':''); d.innerHTML=c.t; labelsEl.appendChild(d); c.el=d; });
@@ -582,7 +703,7 @@ function alternarCorte(){
   capas.forEach(c=>c.el.classList.toggle('hidden', !verCorte));
   controls.maxPolarAngle = verCorte ? 1.75 : 1.42;
   scene.fog.far = verCorte ? 1400 : 900;
-  sky.visible = !verCorte; scene.background = verCorte ? new THREE.Color(0x0c1a24) : null;
+  sky.visible = !verCorte; nubes.forEach(n=>n.partes.forEach(p=>p.sp.visible=!verCorte)); scene.background = verCorte ? new THREE.Color(0x0c1a24) : null;
   const port = innerWidth < innerHeight;
   if (verCorte){ const d = port?250:175; volarA(new THREE.Vector3(HX-55, -28, ZC + d), new THREE.Vector3(HX-55, -44, ZC)); aviso('Esto es un corte de la Tierra. La <b>pluma del manto</b> sube por <b>convección</b>. Arriba, la roca se funde porque <b>baja la presión</b>, y el magma atraviesa la corteza.', 7); }
   else volarA(camNormal.pos.clone(), camNormal.tgt.clone());
@@ -758,10 +879,12 @@ function bucle(){
     if (e.activo){ if (e.cima>MAR) erup={v,e}; else subm={v,e}; }
     else if (!erup && t-tp < .3 && e.cima>MAR && !v.sub) erup={v,e,chico:true,post:true}; });
   const rj = rejuvEstado(t); if (!erup && rj && rj.activo) erup = { v:{z:rj.z, w:2}, e:{x:rj.x, cima:rj.h+1} , chico:true };
+  uPlaca.value = V*t;
+  if (erup && !erup.chico) uLava.value.set(erup.e.x, erup.v.z, erup.v.w, 1); else uLava.value.w = 0;
   if (erup){
     const cx=erup.e.x, cz=erup.v.z, cy=Math.max(MAR,erup.e.cima)+.3;
     brillo.visible=true; brillo.position.set(cx,cy+.6,cz); const s=(erup.chico?5:10)*(1+.08*Math.sin(uT.value*9)); brillo.scale.set(s,s,1);
-    luzLava.position.set(cx,cy+3,cz); luzLava.intensity = (erup.chico?250:700)*(.85+.15*Math.sin(uT.value*11));
+    luzLava.position.set(cx,cy+3,cz); luzLava.intensity = (erup.chico?60:160)*(.85+.15*Math.sin(uT.value*11));
     // humo
     if (Math.random()<.5){ const h=humos.find(h=>!h.visible); if(h){ h.visible=true; h.userData={vida:0, vx:.6+Math.random()*.5, vz:(Math.random()-.5)*.4, vy:2.2+Math.random()}; h.position.set(cx+(Math.random()-.5)*2,cy+1,cz+(Math.random()-.5)*2); } }
     // chispas
@@ -780,6 +903,22 @@ function bucle(){
   buG.attributes.position.needsUpdate = true;
 
   if (marca.visible){ const k=1+.06*Math.sin(uT.value*5); marca.scale.set(k,k,1); if (uT.value>marcaHasta) marca.visible=false; }
+  texRoca.offset.x = texRocaN.offset.x = (V*t/(X_MAX-X_MIN))*26;
+  // nubes
+  if (!verCorte) for (const n of nubes){ n.x -= dt*1.6; if (n.x < -260) n.x = 200; for (const p of n.partes) p.sp.position.set(n.x+p.ox, n.y+p.oy, n.z+p.oz); }
+  vols.forEach((v,q)=>{ const e=estados[q], ps=nubesIsla[q];
+    const op = (!verCorte && e && e.edad>=0 && e.cima>4 && !v.sub && !e.activo) ? Math.min(.7, (e.cima-4)/6) : 0;
+    ps.forEach((sp,k)=>{ sp.material.opacity = op; sp.visible = op>0.01; if (!sp.visible) return;
+      sp.position.set(e.x + (k-1)*v.w*.5, e.cima + 5 + k*1.5, v.z + v.w*.35 + (k%2)*3); }); });
+  // vapor donde la lava llega al mar
+  if (erup && !erup.chico){
+    costaT -= dt; if (costaT<=0 || !costa){ costaT=.5; costa=null;
+      const jz = (z)=>Math.max(0,Math.min(NZ,Math.round((z-Z_MIN)/DZ)));
+      for (let r=.25; r<2.2; r+=.06){ const xx=erup.e.x + r*erup.v.w*.35, zz=erup.v.z + r*erup.v.w*.94;
+        if (alturaEn(xx, zz, jz(zz), t, estados) < MAR){ costa = new THREE.Vector3(xx, MAR, zz); break; } } }
+    if (costa && Math.random()<.35){ const s=vapores.find(s=>!s.visible); if (s){ s.visible=true; s.userData={vida:0}; s.position.copy(costa).add(new THREE.Vector3((Math.random()-.5)*3,.5,(Math.random()-.5)*3)); } }
+  }
+  vapores.forEach(s=>{ if(!s.visible) return; const u=s.userData; u.vida+=dt*.35; s.position.y+=dt*4; s.position.x-=dt*1.5; const k=2+u.vida*10; s.scale.set(k,k,1); s.material.opacity=Math.max(0,.8*(1-u.vida))*Math.min(1,u.vida*6); if(u.vida>=1) s.visible=false; });
   // océano
   olas.offset.x += dt*.012; olas.offset.y += dt*.008; olas2.offset.x -= dt*.006; olas2.offset.y += dt*.01;
 
