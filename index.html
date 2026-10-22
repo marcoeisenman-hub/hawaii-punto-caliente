@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Hawái: Punto Caliente</title>
+<meta name="description" content="Juego 3D: mueve la placa del Pacífico sobre el punto caliente y mira cómo nacen las islas Hawái.">
+<meta name="theme-color" content="#0f2f45">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%230f2f45'/><path d='M18 70 L42 34 L50 44 L60 30 L84 70Z' fill='%23e05a1f'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0f2f45; --ink2:#16405c; --lava:#e05a1f; --lava2:#ff8a3d; --cream:#faf6ec;
+  --glass:rgba(10,24,36,.72); --line:rgba(255,255,255,.14); --ok:#2f9e6b; --bad:#c8402a;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#0b1a26;color:#fff;font-family:Inter,system-ui,-apple-system,sans-serif}
+canvas{display:block;touch-action:none}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+.hidden{display:none!important}
+
+/* barra superior */
+#top{position:fixed;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;flex-direction:column;gap:6px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(6,16,24,.78),rgba(6,16,24,0))}
+#tiempo{font-size:clamp(20px,5.6vw,30px);font-weight:700;letter-spacing:-.01em;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+#tiempo small{display:block;font-size:12px;font-weight:500;opacity:.75;letter-spacing:.02em;text-transform:uppercase}
+#etapas{display:flex;gap:4px;flex-wrap:wrap}
+#etapas span{font-size:11px;font-weight:600;padding:4px 7px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.55);transition:.3s}
+#etapas span.on{background:var(--lava);color:#fff}
+#etapasNombre{font-size:12px;opacity:.85}
+#puntos{position:fixed;top:calc(12px + env(safe-area-inset-top));right:16px;font-weight:700;font-size:15px;background:var(--glass);border:1px solid var(--line);padding:6px 10px;border-radius:10px;backdrop-filter:blur(8px)}
+
+/* barra inferior */
+#bar{position:fixed;left:0;right:0;bottom:0;padding:10px 12px calc(12px + env(safe-area-inset-bottom));display:flex;gap:8px;justify-content:center;
+  background:linear-gradient(0deg,rgba(6,16,24,.8),rgba(6,16,24,0))}
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;height:46px;min-width:46px;padding:0 14px;border-radius:12px;background:var(--glass);border:1px solid var(--line);font-weight:600;font-size:14px;backdrop-filter:blur(8px)}
+.btn.prim{background:var(--lava);border-color:transparent}
+.btn.on{background:#fff;color:var(--ink)}
+.btn svg{width:20px;height:20px}
+
+/* avisos */
+#toast{position:fixed;left:50%;top:calc(118px + env(safe-area-inset-top));transform:translateX(-50%);max-width:min(92vw,440px);background:var(--glass);border:1px solid var(--line);border-left:4px solid var(--lava);
+  padding:10px 14px;border-radius:10px;font-size:14px;line-height:1.35;backdrop-filter:blur(8px);opacity:0;transition:opacity .35s;pointer-events:none}
+#toast.show{opacity:1}
+
+/* etiquetas 3D */
+.lab{position:fixed;left:0;top:0;transform:translate(-50%,-100%);pointer-events:none;font-size:12px;font-weight:600;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.9);padding-bottom:4px}
+.lab.isla{font-size:13px}
+.lab.isla:after{content:"";display:block;width:1px;height:14px;background:rgba(255,255,255,.7);margin:2px auto 0}
+.lab.capa{transform:translate(0,-50%);font-size:12px;background:rgba(6,16,24,.6);padding:3px 7px;border-radius:6px;text-shadow:none}
+.lab.capa.der{transform:translate(-100%,-50%);text-align:right}
+.lab.capa b{color:var(--lava2)}
+
+/* tarjetas */
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(4,12,18,.55);backdrop-filter:blur(3px);z-index:20}
+.card{width:min(100%,440px);max-height:calc(100% - 16px);overflow:auto;background:var(--cream);color:var(--ink);border-radius:18px;padding:22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.card h1{margin:0 0 4px;font-size:28px;letter-spacing:-.02em;line-height:1.05}
+.card h2{margin:0 0 6px;font-size:21px;letter-spacing:-.01em}
+.card .kick{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--lava)}
+.card p{margin:8px 0;font-size:15px;line-height:1.45;color:#2a3a46}
+.card .dato{background:#fff;border-left:4px solid var(--lava);padding:10px 12px;border-radius:8px;font-size:14px;line-height:1.4;margin:12px 0}
+.card .preg{font-weight:700;font-size:16px;margin:14px 0 10px;color:var(--ink)}
+.opc{display:block;width:100%;text-align:left;padding:12px 14px;margin:8px 0;border-radius:10px;background:#fff;border:2px solid #e2dccd;color:var(--ink);font-size:15px;font-weight:500;transition:.15s}
+.opc.ok{border-color:var(--ok);background:#e6f6ee}
+.opc.bad{border-color:var(--bad);background:#fbe9e5}
+.opc:disabled{cursor:default}
+.card .go{display:block;width:100%;margin-top:14px;height:50px;border-radius:12px;background:var(--ink);color:#fff;font-weight:700;font-size:16px}
+.card .go.lava{background:var(--lava)}
+.card ul{padding-left:18px;margin:10px 0;font-size:14px;line-height:1.5;color:#2a3a46}
+.fb{font-size:14px;line-height:1.4;margin-top:6px;font-weight:600}
+.fb.ok{color:var(--ok)} .fb.bad{color:var(--bad)}
+.estrellas{font-size:34px;letter-spacing:4px;color:var(--lava);margin:6px 0}
+.nota{font-size:12px;color:#6b7680}
+
+/* info al tocar volcán */
+#info{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(92vw,400px);background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:12px 14px;backdrop-filter:blur(10px);font-size:14px;line-height:1.4}
+#info b{font-size:16px}
+#info .x{position:absolute;right:6px;top:4px;width:32px;height:32px;font-size:20px;opacity:.7}
+#modelo{position:fixed;right:12px;bottom:calc(66px + env(safe-area-inset-bottom));font-size:10px;opacity:.6;text-align:right;max-width:150px;pointer-events:none}
+#reto{position:fixed;left:50%;top:calc(126px + env(safe-area-inset-top));transform:translateX(-50%);pointer-events:none;width:min(88vw,380px);text-align:center;background:var(--glass);border:2px solid var(--lava);border-radius:14px;padding:14px 16px;font-weight:600;font-size:16px;line-height:1.35;backdrop-filter:blur(8px)}
+#reto small{display:block;font-weight:500;font-size:13px;opacity:.8;margin-top:4px}
+#cargando{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b1a26;z-index:30;font-weight:600;letter-spacing:.02em}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"./vendor/three.module.min.js"
+}}
+</script>
+</head>
+<body>
+<div id="cargando">Cargando el Pacífico…</div>
+
+<div id="top">
+  <div id="tiempo"><small>Tiempo</small><span id="tTxt">Hace 5,6 millones de años</span></div>
+  <div id="etapasNombre"></div>
+  <div id="etapas">
+    <span data-e="pre">Pre-escudo</span><span data-e="escudo">Escudo</span><span data-e="post">Post-escudo</span><span data-e="erosion">Erosión</span><span data-e="rejuv">Rejuvenec.</span>
+  </div>
+</div>
+<div id="puntos">0 pts</div>
+<div id="modelo">Modelo simplificado · edades aproximadas · no está a escala</div>
+<div id="toast"></div>
+<div id="labels"></div>
+<div id="info" class="hidden"></div>
+<div id="reto" class="hidden"></div>
+
+<div id="bar">
+  <button class="btn prim" id="bPlay" aria-label="Pausa"></button>
+  <button class="btn" id="bVel">x1</button>
+  <button class="btn" id="bCorte">Ver por dentro</button>
+  <button class="btn" id="bSon" aria-label="Sonido"></button>
+</div>
+
+<div class="modal" id="mInicio">
+  <div class="card">
+    <div class="kick">Escanea · juega · aprende</div>
+    <h1>El nacimiento de Hawái</h1>
+    <p>Hace 5,6 millones de años, en medio del océano Pacífico, no había islas. Debajo hay un <b>punto caliente</b> que no se mueve. Encima, la <b>placa del Pacífico</b> avanza hacia el noroeste.</p>
+    <ul>
+      <li><b>▶</b> hace correr el tiempo. Mira cómo nace cada isla.</li>
+      <li><b>Ver por dentro</b> corta la Tierra y muestra la pluma del manto.</li>
+      <li>Arrastra para girar la cámara. Toca un volcán para ver su edad.</li>
+      <li>Responde las preguntas y adivina dónde nacerá la próxima isla para ganar puntos.</li>
+    </ul>
+    <button class="go lava" id="bJugar">Jugar</button>
+    <p class="nota">Proyecto de Ciencias Naturales · 8.º grado. Las distancias y alturas no están a escala.</p>
+  </div>
+</div>
+<div class="modal hidden" id="mPreg"><div class="card" id="cPreg"></div></div>
+<div class="modal hidden" id="mFin"><div class="card" id="cFin"></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from './vendor/OrbitControls.js';
+import { Sky } from './vendor/Sky.js';
+
+/* ---------- Mundo (unidades: 1 = ~280 m de altura) ---------- */
+const V = 24;                 // velocidad de la placa (unidades / millón de años)
+const HX = 60, HZ = 4;        // punto caliente (fijo)
+const PLUMA_R = 16;
+const MAR = 0, FONDO = -14;
+const M_POR_U = 280;
+const T0 = -5.6, T1 = 0;
+const SEG_POR_MA = 18;        // segundos por millón de años a x1
+const X_MIN = -170, X_MAX = 100, Z_MIN = -70, Z_MAX = 70;
+const NX = 240, NZ = 120;
+const ZC = 6;                 // plano de corte
+
+/* volcanes: tB = nace, crece = duración sobre el punto caliente */
+const VOLCANES = [
+  { n:'Niʻihau',            tB:-6.6, crece:1.0, H:20, w:11, z:-15, ero:.9, sink:.55 },
+  { n:'Kauaʻi',             tB:-5.4, crece:1.1, H:26, w:14, z:-11, ero:1.0, sink:.7, q:0 },
+  { n:'Oʻahu',              tB:-3.5, crece:1.0, H:24, w:13, z:-6,  ero:1.0, sink:.7, q:1 },
+  { n:'Molokaʻi',           tB:-2.5, crece:.9,  H:21, w:10, z:-1,  ero:1.0, sink:.7 },
+  { n:'Maui',               tB:-1.75,crece:.9,  H:25, w:12, z:2,   ero:1.0, sink:.7, q:2 },
+  { n:'Isla de Hawái',      tB:-0.85,crece:.85, H:29, w:17, z:6,   ero:1.0, sink:.7, q:3 },
+  { n:'Kamaʻehuakanaloa',   tB:-0.26,crece:.26, H:10.5, w:7, z:10, ero:0, sink:0, q:4, sub:true },
+];
+// rejuvenecimiento de Oʻahu (como el que formó Diamond Head)
+const REJUV = { de:'Oʻahu', t:-0.55, dur:.12, H:2.2, w:2.2, dx:7, dz:3 };
+
+for (const v of VOLCANES){ v.lx = HX + V*v.tB; v.emergio = false; v.salio = false; v.erosiono = false; }
+
+/* ---------- Ruido ---------- */
+function hash(x,y){ let h = Math.sin(x*127.1 + y*311.7)*43758.5453; return h - Math.floor(h); }
+function vnoise(x,y){
+  const xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi;
+  const u=xf*xf*(3-2*xf), w=yf*yf*(3-2*yf);
+  const a=hash(xi,yi), b=hash(xi+1,yi), c=hash(xi,yi+1), d=hash(xi+1,yi+1);
+  return a+(b-a)*u+(c-a)*w+(a-b-c+d)*u*w;
+}
+function fbm(x,y,o=4){ let s=0,a=.5,f=1; for(let i=0;i<o;i++){ s+=a*vnoise(x*f,y*f); f*=2.03; a*=.5; } return s; }
+
+/* rejilla precalculada en coordenadas de la placa (se mueve con ella) */
+const DX = (X_MAX-X_MIN)/NX, DZ = (Z_MAX-Z_MIN)/NZ;
+const LX_MIN = X_MIN + V*T0 - 4, LX_MAX = X_MAX + 4;
+const NLX = Math.ceil((LX_MAX-LX_MIN)/DX)+2;
+const baseG = new Float32Array(NLX*(NZ+1)), rugG = new Float32Array(NLX*(NZ+1));
+for (let i=0;i<NLX;i++) for (let j=0;j<=NZ;j++){
+  const lx = LX_MIN + i*DX, z = Z_MIN + j*DZ;
+  baseG[i*(NZ+1)+j] = (fbm(lx*.035, z*.035, 4)-.5)*2.6 + (fbm(lx*.15+40, z*.15, 2)-.5)*.6;
+  const r = 1 - Math.abs(fbm(lx*.12+9, z*.12-3, 3)*2-1);
+  rugG[i*(NZ+1)+j] = r*r;
+}
+function sampleG(g, lx, j){
+  const fi = (lx-LX_MIN)/DX, i = Math.max(0, Math.min(NLX-2, Math.floor(fi))), t = fi-i;
+  return g[i*(NZ+1)+j]*(1-t) + g[(i+1)*(NZ+1)+j]*t;
+}
+
+/* ---------- Estado de cada volcán en el tiempo t ---------- */
+function estado(v, t){
+  const x = v.lx - V*t;
+  if (t < v.tB) return { x, h:0, sink:0, ero:0, activo:false, edad:-1 };
+  const tp = v.tB + v.crece;
+  let h, sink=0, ero=0;
+  if (t <= tp){ const s=(t-v.tB)/v.crece; h = v.H * (s*s*(3-2*s)); }
+  else { const a=t-tp; h = Math.max(0, v.H - v.ero*a); sink = v.sink*a; ero = Math.min(1, a/3); }
+  return { x, h, sink, ero, activo: t < tp, edad: t - v.tB, cima: FONDO + h - sink };
+}
+function etapaDe(v, e, t){
+  if (e.edad < 0) return null;
+  if (v.n==='Oʻahu' && t>=REJUV.t && t<REJUV.t+REJUV.dur+.15) return 'rejuv';
+  if (e.activo) return e.cima < MAR ? 'pre' : 'escudo';
+  if (t - (v.tB+v.crece) < .5) return 'post';
+  return 'erosion';
+}
+const NOMBRE_ETAPA = { pre:'Pre-escudo: crece bajo el mar', escudo:'Escudo: sobre el punto caliente, mucha lava', post:'Post-escudo: se aleja del punto caliente', erosion:'Erosión y hundimiento: se apaga y se desgasta', rejuv:'Rejuvenecimiento: una erupción pequeña' };
+
+/* ---------- Escena ---------- */
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = .55;
+renderer.localClippingEnabled = true;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(48, innerWidth/innerHeight, .5, 2500);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = .08;
+controls.minDistance = 25; controls.maxDistance = 330; controls.maxPolarAngle = 1.42;
+
+/* cielo + luz */
+const sky = new Sky(); sky.scale.setScalar(4000); scene.add(sky);
+const su = sky.material.uniforms;
+su.turbidity.value = 2.2; su.rayleigh.value = 1.1; su.mieCoefficient.value = .004; su.mieDirectionalG.value = .85;
+const sol = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(58), THREE.MathUtils.degToRad(200));
+su.sunPosition.value.copy(sol);
+const pmrem = new THREE.PMREMGenerator(renderer);
+const skyScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(4000); sky2.material.uniforms.sunPosition.value.copy(sol);
+for (const k of ['turbidity','rayleigh','mieCoefficient','mieDirectionalG']) sky2.material.uniforms[k].value = su[k].value;
+skyScene.add(sky2);
+scene.environment = pmrem.fromScene(skyScene).texture;
+scene.fog = new THREE.Fog(0x9fb9cf, 260, 900);
+
+const luzSol = new THREE.DirectionalLight(0xfff1dc, 2.4); luzSol.position.copy(sol).multiplyScalar(200); scene.add(luzSol);
+scene.add(new THREE.HemisphereLight(0xcfe3f5, 0x3a3a34, .55));
+
+/* plano de corte */
+const corte = new THREE.Plane(new THREE.Vector3(0,0,-1), ZC);
+const sinCorte = [];
+
+/* ---------- Terreno ---------- */
+const geo = new THREE.PlaneGeometry(X_MAX-X_MIN, Z_MAX-Z_MIN, NX, NZ);
+geo.rotateX(-Math.PI/2);
+geo.translate((X_MAX+X_MIN)/2, 0, (Z_MAX+Z_MIN)/2);
+const pos = geo.attributes.position;
+const NV = pos.count;
+const col = new Float32Array(NV*3), glow = new Float32Array(NV);
+geo.setAttribute('color', new THREE.BufferAttribute(col,3));
+geo.setAttribute('aGlow', new THREE.BufferAttribute(glow,1));
+// índice de columna/fila para cada vértice
+const vi = new Int32Array(NV), vj = new Int32Array(NV);
+for (let k=0;k<NV;k++){ vi[k]=Math.round((pos.getX(k)-X_MIN)/DX); vj[k]=Math.round((pos.getZ(k)-Z_MIN)/DZ); }
+
+const matTerreno = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:.93, metalness:0, envMapIntensity:.6, clippingPlanes:sinCorte, side:THREE.DoubleSide });
+matTerreno.onBeforeCompile = (sh)=>{
+  sh.uniforms.uT = uT;
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aGlow; varying float vGlow; varying vec3 vWp;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = aGlow; vWp = (modelMatrix*vec4(position,1.)).xyz;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vGlow; varying vec3 vWp; uniform float uT;')
+    .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      float fl = .75 + .25*sin(uT*6. + vWp.x*.9 + vWp.z*1.3);
+      totalEmissiveRadiance += vec3(1.0,.30,.04) * vGlow * 4.5 * fl;`);
+};
+const uT = { value:0 };
+const terreno = new THREE.Mesh(geo, matTerreno);
+scene.add(terreno);
+
+const vols = VOLCANES;
+let estados = [];
+function alturaEn(x, z, j, t, est){
+  const lx = x + V*t;
+  let y = FONDO + sampleG(baseG, lx, j);
+  for (let q=0;q<vols.length;q++){
+    const v = vols[q], e = est[q]; if (e.edad < 0) continue;
+    const w = v.w * (1 + e.ero*.25);
+    const dx = x - e.x; if (dx > w*2.6 || dx < -w*2.6) continue;
+    const dz = z - v.z; if (dz > w*2.6 || dz < -w*2.6) continue;
+    const r2 = (dx*dx+dz*dz)/(w*w);
+    const f = Math.exp(-r2*1.15);
+    let h = e.h*f;
+    const rg = sampleG(rugG, lx, j);
+    h *= 1 - (.07 + e.ero*.55)*rg*Math.min(1, r2*3);
+    if (e.activo && e.h > 8) h -= e.h*.05*Math.exp(-r2*40);         // caldera
+    y += h - e.sink*f;
+  }
+  // rejuvenecimiento: conito en Oʻahu
+  const rj = rejuvEstado(t);
+  if (rj){ const dx=x-rj.x, dz=z-rj.z, r2=(dx*dx+dz*dz)/(REJUV.w*REJUV.w); y += rj.h*Math.exp(-r2*1.6) - rj.h*.5*Math.exp(-r2*12); }
+  return y;
+}
+function rejuvEstado(t){
+  if (t < REJUV.t) return null;
+  const o = vols.find(v=>v.n===REJUV.de), e = estado(o,t);
+  const s = Math.min(1,(t-REJUV.t)/REJUV.dur);
+  return { x:e.x+REJUV.dx, z:o.z+REJUV.dz, h:REJUV.H*s - (e.sink)*0, activo: s<1 };
+}
+
+const cBasaltoJ = new THREE.Color(.075,.07,.068), cBasaltoV = new THREE.Color(.16,.145,.13), cVerde = new THREE.Color(.11,.24,.07),
+      cVerde2 = new THREE.Color(.2,.31,.1), cTierra = new THREE.Color(.36,.22,.13), cArena = new THREE.Color(.72,.64,.47), cArenaN = new THREE.Color(.09,.085,.08),
+      cFondo = new THREE.Color(.17,.2,.21), cSub = new THREE.Color(.2,.19,.18);
+const tmp = new THREE.Color();
+let frameN = 0;
+function actualizarTerreno(t, normales){
+  estados = vols.map(v=>estado(v,t));
+  const est = estados;
+  const rj = rejuvEstado(t);
+  for (let k=0;k<NV;k++){
+    const x = pos.getX(k), z = pos.getZ(k), j = vj[k];
+    const y = alturaEn(x, z, j, t, est);
+    const borde = Math.min(1, Math.min(x-X_MIN, X_MAX-x, z-Z_MIN, Z_MAX-z)/14);
+    pos.setY(k, borde<1 ? (FONDO-1.6)+(y-(FONDO-1.6))*borde : y);
+    // volcán dominante
+    let dom=-1, best=0, rdom=9;
+    for (let q=0;q<vols.length;q++){
+      const e=est[q]; if (e.edad<0) continue;
+      const v=vols[q], dx=x-e.x, dz=z-v.z, r2=(dx*dx+dz*dz)/(v.w*v.w), f=Math.exp(-r2*1.15)*e.h;
+      if (f>best){best=f;dom=q;rdom=Math.sqrt(r2);}
+    }
+    const lx = x+V*t, n = sampleG(rugG, lx, j);
+    let g = 0;
+    if (y > MAR + .45){
+      if (dom>=0){
+        const e = est[dom], v = vols[dom];
+        const edadPico = t - (v.tB+v.crece);
+        const veg = Math.max(0, Math.min(1, (edadPico+.25)/1.1)) * (1 - Math.max(0,Math.min(1,(y-9.5)/4)));
+        tmp.copy(cBasaltoJ).lerp(cBasaltoV, Math.max(0,Math.min(1,edadPico/.8)));
+        tmp.lerp(n>.45?cVerde:cVerde2, veg*.95);
+        if (e.ero>.3) tmp.lerp(cTierra, (n>.7?.55:0)*e.ero);
+        // ríos de lava en volcanes activos sobre el mar
+        if (e.activo && e.cima > MAR){
+          const ang = Math.atan2(z-v.z, x-e.x);
+          const rio = Math.pow(Math.max(0, Math.cos(ang*5 + vnoise(rdom*3,ang*2)*3 + v.tB*7)), 26);
+          g = (rdom<.14 ? .9 : 0) + rio * Math.max(0, 1 - rdom/1.0) * (rdom>.12?1:0);
+        }
+      } else tmp.copy(cBasaltoV);
+    } else if (y > MAR - .2){
+      const joven = dom>=0 && (t-(vols[dom].tB+vols[dom].crece)) < .4;
+      tmp.copy(joven?cArenaN:cArena);
+    } else {
+      const prof = Math.max(0, Math.min(1, (MAR - y)/(MAR - FONDO)));
+      tmp.copy(dom>=0 && best>1 ? cSub : cFondo).lerp(cArena, Math.max(0, .5 - prof*3));
+    }
+    if (rj && rj.activo){ const dx=x-rj.x, dz=z-rj.z; if (dx*dx+dz*dz < 2.2) g = .9; }
+    col[k*3]=tmp.r; col[k*3+1]=tmp.g; col[k*3+2]=tmp.b;
+    glow[k]=g;
+  }
+  pos.needsUpdate = true; geo.attributes.color.needsUpdate = true; geo.attributes.aGlow.needsUpdate = true;
+  if (normales) geo.computeVertexNormals();
+}
+
+/* ---------- Océano ---------- */
+function texturaOlas(){
+  const S=256, c=document.createElement('canvas'); c.width=c.height=S;
+  const x=c.getContext('2d'), img=x.createImageData(S,S);
+  const H = new Float32Array(S*S);
+  for (let j=0;j<S;j++) for (let i=0;i<S;i++){
+    let s=0, a=1, f=4;
+    for (let o=0;o<5;o++){ s += a*(vnoiseT(i/S*f, j/S*f, f)); a*=.5; f*=2; }
+    H[j*S+i]=s;
+  }
+  for (let j=0;j<S;j++) for (let i=0;i<S;i++){
+    const l=H[j*S+(i-1+S)%S], r=H[j*S+(i+1)%S], u=H[((j-1+S)%S)*S+i], d=H[((j+1)%S)*S+i];
+    const nx=(l-r)*2.2, ny=(u-d)*2.2, nz=1, L=Math.hypot(nx,ny,nz), p=(j*S+i)*4;
+    img.data[p]=(nx/L*.5+.5)*255; img.data[p+1]=(ny/L*.5+.5)*255; img.data[p+2]=(nz/L*.5+.5)*255; img.data[p+3]=255;
+  }
+  x.putImageData(img,0,0);
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+}
+function vnoiseT(x,y,P){ // ruido que se repite cada P
+  const xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi, u=xf*xf*(3-2*xf), w=yf*yf*(3-2*yf);
+  const m=(a)=>((a%P)+P)%P;
+  const a=hash(m(xi),m(yi)), b=hash(m(xi+1),m(yi)), c=hash(m(xi),m(yi+1)), d=hash(m(xi+1),m(yi+1));
+  return a+(b-a)*u+(c-a)*w+(a-b-c+d)*u*w;
+}
+const olas = texturaOlas(); olas.repeat.set(28,28);
+const olas2 = olas.clone(); olas2.repeat.set(11,11); olas2.needsUpdate = true;
+const matMar = new THREE.MeshPhysicalMaterial({ color:0x04314a, roughness:.06, metalness:0, transparent:true, opacity:.86,
+  normalMap:olas, normalScale:new THREE.Vector2(.35,.35), clearcoat:1, clearcoatRoughness:.08, clearcoatNormalMap:olas2,
+  clearcoatNormalScale:new THREE.Vector2(.25,.25), envMapIntensity:1.1, clippingPlanes:sinCorte, side:THREE.DoubleSide, depthWrite:false });
+// fondo marino lejano (para que no se vea el borde)
+const fondoLejos = new THREE.Mesh(new THREE.PlaneGeometry(2400,2400), new THREE.MeshStandardMaterial({ color:new THREE.Color().setRGB(.17,.2,.21), roughness:.93, envMapIntensity:.6, clippingPlanes:sinCorte }));
+fondoLejos.rotation.x = -Math.PI/2; fondoLejos.position.y = FONDO-1.6; scene.add(fondoLejos);
+const mar = new THREE.Mesh(new THREE.PlaneGeometry(2400,2400), matMar);
+mar.rotation.x = -Math.PI/2; mar.position.y = MAR; mar.renderOrder = 2;
+scene.add(mar);
+
+/* espuma en la costa: anillo claro donde el terreno toca el mar */
+/* (se logra con la arena + transparencia del mar) */
+
+/* ---------- Vista por dentro ---------- */
+const interior = new THREE.Group(); interior.visible = false; scene.add(interior);
+function texturaFlechas(fondo, linea){
+  const c=document.createElement('canvas'); c.width=512; c.height=128; const x=c.getContext('2d');
+  x.fillStyle=fondo; x.fillRect(0,0,512,128);
+  for(let i=0;i<1400;i++){ x.fillStyle=`rgba(0,0,0,${Math.random()*.12})`; x.fillRect(Math.random()*512,Math.random()*128,2,2); }
+  x.strokeStyle=linea; x.lineWidth=7; x.lineCap='round';
+  for (const cx of [128,384]){ x.beginPath(); x.moveTo(cx+60,64); x.lineTo(cx-60,64); x.moveTo(cx-60,64); x.lineTo(cx-34,44); x.moveTo(cx-60,64); x.lineTo(cx-34,84); x.stroke(); }
+  const t=new THREE.CanvasTexture(c); t.wrapS=THREE.RepeatWrapping; t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+const LITO_TOP = FONDO-3.5, LITO_BOT = -40, ASTE_BOT = -100;
+// corteza (cortina que sigue el relieve en el plano de corte)
+const NC = 300;
+const cortinaG = new THREE.BufferGeometry();
+const cPos = new Float32Array((NC+1)*2*3), cIdx=[];
+for (let i=0;i<NC;i++){ const a=i*2,b=a+1,c=a+2,d=a+3; cIdx.push(a,c,b, b,c,d); }
+cortinaG.setAttribute('position', new THREE.BufferAttribute(cPos,3)); cortinaG.setIndex(cIdx);
+const cortina = new THREE.Mesh(cortinaG, new THREE.MeshStandardMaterial({ color:0x2b2724, roughness:1, side:THREE.DoubleSide }));
+interior.add(cortina);
+const jZC = Math.round((ZC - Z_MIN)/DZ);
+function actualizarCortina(t){
+  for (let i=0;i<=NC;i++){
+    const x = X_MIN + (X_MAX-X_MIN)*i/NC;
+    const y = alturaEn(x, ZC, jZC, t, estados);
+    cPos.set([x,y,ZC+.02, x,LITO_TOP,ZC+.02], i*6);
+  }
+  cortinaG.attributes.position.needsUpdate = true; cortinaG.computeBoundingSphere();
+}
+function caja(y0,y1,mat){ const m=new THREE.Mesh(new THREE.BoxGeometry(X_MAX-X_MIN,y0-y1,ZC-Z_MIN),mat); m.position.set((X_MAX+X_MIN)/2,(y0+y1)/2,(ZC+Z_MIN)/2); interior.add(m); return m; }
+const texLito = texturaFlechas('#5a4a3c','rgba(255,240,220,.55)'); texLito.repeat.set(5,1);
+const lito = caja(LITO_TOP, LITO_BOT, new THREE.MeshStandardMaterial({ map:texLito, roughness:1 }));
+const corteza = caja(FONDO-.2, LITO_TOP, new THREE.MeshStandardMaterial({ color:0x24211f, roughness:1 }));
+corteza.scale.y = 1;
+const aste = caja(LITO_BOT, ASTE_BOT, new THREE.MeshStandardMaterial({ color:0x8a4a22, roughness:1, emissive:0x3a1405, emissiveIntensity:.6 }));
+// pluma del manto (shader animado)
+const matPluma = new THREE.ShaderMaterial({
+  transparent:true, depthWrite:false, uniforms:{ uT },
+  vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+  fragmentShader:`varying vec2 vUv; uniform float uT;
+    float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+    float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y); }
+    void main(){
+      vec2 p = vUv; float y = p.y;
+      float sk = .5 - .09*smoothstep(.55,1.,y);              // la placa arrastra la cabeza
+      float ancho = mix(.06,.11,y) + .36*smoothstep(.72,1.,y)*(1.-smoothstep(.97,1.,y)*.4);
+      float d = abs(p.x - sk)/ancho;
+      float flujo = n(vec2(p.x*9., y*7. - uT*1.6)) * .5 + n(vec2(p.x*22., y*16. - uT*2.4))*.35;
+      float a = smoothstep(1., .55, d + (flujo-.4)*.35);
+      vec3 c = mix(vec3(1.,.42,.07), vec3(1.,.86,.45), smoothstep(.9,.0,d)*(.6+.4*flujo));
+      gl_FragColor = vec4(c*1.6, a*.95);
+    }`
+});
+const pluma = new THREE.Mesh(new THREE.PlaneGeometry(90, LITO_BOT-ASTE_BOT+4), matPluma);
+pluma.position.set(HX, (LITO_BOT+ASTE_BOT)/2+2, ZC+.15); interior.add(pluma);
+// gotas de magma que suben por la litosfera (fusión por descompresión)
+const NG = 70, gotasG = new THREE.BufferGeometry(), gPos = new Float32Array(NG*3), gVida = new Float32Array(NG);
+gotasG.setAttribute('position', new THREE.BufferAttribute(gPos,3));
+const gotas = new THREE.Points(gotasG, new THREE.PointsMaterial({ color:0xffa040, size:1.6, sizeAttenuation:true, transparent:true, opacity:.95, depthWrite:false }));
+interior.add(gotas);
+for (let i=0;i<NG;i++){ gVida[i]=Math.random(); }
+// conducto de magma del volcán activo
+const conducto = new THREE.Mesh(new THREE.PlaneGeometry(1.6,1), new THREE.MeshBasicMaterial({ color:0xff6a1a }));
+conducto.position.z = ZC+.1; interior.add(conducto);
+const luzPluma = new THREE.PointLight(0xff7a2a, 900, 90, 1.6); luzPluma.position.set(HX, LITO_BOT+4, ZC+14); interior.add(luzPluma);
+
+/* ---------- Efectos de erupción ---------- */
+function texRadial(stops){
+  const c=document.createElement('canvas'); c.width=c.height=128; const x=c.getContext('2d');
+  const g=x.createRadialGradient(64,64,0,64,64,64); stops.forEach(([o,s])=>g.addColorStop(o,s)); x.fillStyle=g; x.fillRect(0,0,128,128);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+const texHumo = texRadial([[0,'rgba(255,255,255,.55)'],[.5,'rgba(255,255,255,.22)'],[1,'rgba(255,255,255,0)']]);
+const texBrillo = texRadial([[0,'rgba(255,220,150,1)'],[.25,'rgba(255,120,30,.7)'],[1,'rgba(255,60,0,0)']]);
+const humos = [];
+for (let i=0;i<46;i++){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:texHumo, color:0x8b8580, transparent:true, depthWrite:false, opacity:0, fog:true }));
+  s.userData.vida = 0; s.visible=false; scene.add(s); humos.push(s);
+}
+const brillo = new THREE.Sprite(new THREE.SpriteMaterial({ map:texBrillo, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true }));
+brillo.scale.set(10,10,1); brillo.visible=false; scene.add(brillo);
+const luzLava = new THREE.PointLight(0xff5a1a, 0, 45, 1.4); scene.add(luzLava);
+const NS = 140, chG = new THREE.BufferGeometry(), chP = new Float32Array(NS*3), chV = new Float32Array(NS*3), chL = new Float32Array(NS);
+chG.setAttribute('position', new THREE.BufferAttribute(chP,3));
+const chispas = new THREE.Points(chG, new THREE.PointsMaterial({ color:0xffa040, size:.45, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false }));
+scene.add(chispas);
+const NB = 90, buG = new THREE.BufferGeometry(), buP = new Float32Array(NB*3), buL = new Float32Array(NB);
+buG.setAttribute('position', new THREE.BufferAttribute(buP,3));
+const burbujas = new THREE.Points(buG, new THREE.PointsMaterial({ color:0xd8f2ff, size:.5, transparent:true, opacity:.8, depthWrite:false }));
+scene.add(burbujas);
+for (let i=0;i<NB;i++){ buP[i*3+1]=-999; }
+for (let i=0;i<NS;i++){ chP[i*3+1]=-999; }
+
+/* marcador del punto caliente (se muestra en el reto) */
+const marca = new THREE.Mesh(new THREE.RingGeometry(14, 16.5, 64), new THREE.MeshBasicMaterial({ color:0xff6a1a, transparent:true, opacity:.9, side:THREE.DoubleSide, depthWrite:false }));
+marca.rotation.x = -Math.PI/2; marca.position.set(HX, MAR+.25, HZ); marca.visible = false; marca.renderOrder = 3; scene.add(marca);
+const pin = new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,6,12), new THREE.MeshBasicMaterial({ color:0xffffff }));
+pin.visible=false; scene.add(pin);
+let marcaHasta = 0;
+
+/* ---------- Etiquetas HTML ---------- */
+const labelsEl = document.getElementById('labels');
+const labIsla = vols.map(v=>{ const d=document.createElement('div'); d.className='lab isla'; d.textContent=v.n; labelsEl.appendChild(d); return d; });
+const capas = [
+  { t:'<b>Litosfera</b> · placa del Pacífico ← se mueve al noroeste', p:()=>new THREE.Vector3(X_MIN+30,(LITO_TOP+LITO_BOT)/2,ZC) },
+  { t:'<b>Corteza oceánica</b> de basalto', p:()=>new THREE.Vector3(X_MIN+30,(FONDO+LITO_TOP)/2-.5,ZC) },
+  { t:'<b>Astenosfera</b> (manto)', p:()=>new THREE.Vector3(X_MIN+30,(LITO_BOT+ASTE_BOT)/2,ZC) },
+  { t:'<b>Pluma del manto</b> · roca sólida muy caliente<br>que sube lento por convección', p:()=>new THREE.Vector3(HX-9,-78,ZC), der:true },
+  { t:'<b>Punto caliente</b> (fijo) · al bajar la presión,<br>parte de la roca se funde: magma', p:()=>new THREE.Vector3(HX-24,LITO_BOT-5,ZC), der:true },
+];
+capas.forEach(c=>{ const d=document.createElement('div'); d.className='lab capa hidden'+(c.der?' der':''); d.innerHTML=c.t; labelsEl.appendChild(d); c.el=d; });
+const vtmp = new THREE.Vector3();
+function proyectar(v3, el){
+  vtmp.copy(v3).project(camera);
+  if (vtmp.z>1 || Math.abs(vtmp.x)>1.1 || Math.abs(vtmp.y)>1.1){ el.style.display='none'; return; }
+  el.style.display='block';
+  el.style.left = ((vtmp.x*.5+.5)*innerWidth)+'px'; el.style.top = ((-vtmp.y*.5+.5)*innerHeight)+'px';
+}
+
+/* ---------- Sonido (generado) ---------- */
+let ac=null, sonido=true, gMar, gRetumbo, master;
+function iniciarAudio(){
+  if (ac) return;
+  try{
+    ac = new (window.AudioContext||window.webkitAudioContext)();
+    master = ac.createGain(); master.gain.value = sonido?1:0; master.connect(ac.destination);
+    const len = ac.sampleRate*4, buf = ac.createBuffer(1,len,ac.sampleRate), d = buf.getChannelData(0);
+    let last=0; for (let i=0;i<len;i++){ const w=Math.random()*2-1; last=(last+.02*w)/1.02; d[i]=last*3.2; }
+    const ruido = ()=>{ const s=ac.createBufferSource(); s.buffer=buf; s.loop=true; return s; };
+    // mar
+    const s1=ruido(), lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=520;
+    gMar=ac.createGain(); gMar.gain.value=.22; s1.connect(lp).connect(gMar).connect(master); s1.start();
+    const lfo=ac.createOscillator(), lg=ac.createGain(); lfo.frequency.value=.11; lg.gain.value=.1; lfo.connect(lg).connect(gMar.gain); lfo.start();
+    // retumbo volcánico
+    const s2=ruido(), lp2=ac.createBiquadFilter(); lp2.type='lowpass'; lp2.frequency.value=90;
+    gRetumbo=ac.createGain(); gRetumbo.gain.value=0; s2.connect(lp2).connect(gRetumbo).connect(master); s2.start(.3);
+  }catch(e){ ac=null; }
+}
+function tono(f, dur=.18, tipo='sine', vol=.18, f2){
+  if (!ac || !sonido) return;
+  const o=ac.createOscillator(), g=ac.createGain(), t=ac.currentTime;
+  o.type=tipo; o.frequency.setValueAtTime(f,t); if (f2) o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  o.connect(g).connect(master); o.start(t); o.stop(t+dur+.02);
+}
+
+/* ---------- UI ---------- */
+const $ = (id)=>document.getElementById(id);
+const ICON = {
+  play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>',
+  pausa:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4.5v16H6zM13.5 4H18v16h-4.5z"/></svg>',
+  son:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+  mudo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/><path d="M17 9l5 6M22 9l-5 6"/></svg>',
+};
+let t = T0, corriendo = false, vel = 1, puntos = 0, aciertos = 0, enPregunta = false, terminado = false, verCorte = false;
+let sel = null;
+function fmtT(t){
+  if (t > -.03) return 'Hoy';
+  const m = -t; return 'Hace ' + m.toLocaleString('es', { minimumFractionDigits:1, maximumFractionDigits:1 }) + ' millones de años';
+}
+function setPlay(on){ corriendo = on; $('bPlay').innerHTML = on?ICON.pausa:ICON.play; $('bPlay').setAttribute('aria-label', on?'Pausa':'Avanzar el tiempo'); }
+setPlay(false);
+$('bSon').innerHTML = ICON.son;
+$('bPlay').onclick = ()=>{ iniciarAudio(); if (terminado) return; setPlay(!corriendo); tono(520,.08,'triangle',.08); };
+$('bVel').onclick = ()=>{ vel = vel===1?3:1; $('bVel').textContent='x'+vel; $('bVel').classList.toggle('on', vel===3); tono(660,.08,'triangle',.08); };
+$('bSon').onclick = ()=>{ sonido=!sonido; $('bSon').innerHTML = sonido?ICON.son:ICON.mudo; if (master) master.gain.value = sonido?1:0; };
+$('bCorte').onclick = ()=>{ alternarCorte(); tono(440,.1,'triangle',.08); };
+
+let toastT=0;
+function aviso(txt, seg=4){ const el=$('toast'); el.innerHTML=txt; el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'), seg*1000); }
+
+/* cámara */
+const camNormal = { pos:new THREE.Vector3(), tgt:new THREE.Vector3() };
+function encuadreNormal(){
+  const port = innerWidth < innerHeight;
+  if (port){ camNormal.tgt.set(0, 0, 0); camNormal.pos.set(150, 62, 70); }
+  else { camNormal.tgt.set(0, -2, 2); camNormal.pos.set(70, 80, 150); }
+}
+encuadreNormal();
+camera.position.copy(camNormal.pos); controls.target.copy(camNormal.tgt);
+let anim = null;
+function volarA(p, tg, dur=1.4){ anim = { p0:camera.position.clone(), t0:controls.target.clone(), p1:p, t1:tg, s:0, dur }; }
+function alternarCorte(){
+  verCorte = !verCorte;
+  $('bCorte').classList.toggle('on', verCorte);
+  $('bCorte').textContent = verCorte ? 'Ver arriba' : 'Ver por dentro';
+  interior.visible = verCorte;
+  sinCorte.length = 0; if (verCorte) sinCorte.push(corte);
+  matTerreno.needsUpdate = true; matMar.needsUpdate = true; fondoLejos.material.needsUpdate = true;
+  capas.forEach(c=>c.el.classList.toggle('hidden', !verCorte));
+  controls.maxPolarAngle = verCorte ? 1.75 : 1.42;
+  scene.fog.far = verCorte ? 1400 : 900;
+  sky.visible = !verCorte; scene.background = verCorte ? new THREE.Color(0x0c1a24) : null;
+  const port = innerWidth < innerHeight;
+  if (verCorte){ const d = port?250:175; volarA(new THREE.Vector3(HX-55, -28, ZC + d), new THREE.Vector3(HX-55, -44, ZC)); aviso('Esto es un corte de la Tierra. La <b>pluma del manto</b> sube por <b>convección</b>. Arriba, la roca se funde porque <b>baja la presión</b>, y el magma atraviesa la corteza.', 7); }
+  else volarA(camNormal.pos.clone(), camNormal.tgt.clone());
+}
+
+/* tocar un volcán */
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+let down = null;
+renderer.domElement.addEventListener('pointerdown', e=>{ down = { x:e.clientX, y:e.clientY, t:performance.now() }; });
+renderer.domElement.addEventListener('pointerup', e=>{
+  if (!down) return; const mov = Math.hypot(e.clientX-down.x, e.clientY-down.y), dt = performance.now()-down.t; down=null;
+  if (mov > 8 || dt > 400) return;
+  ptr.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+  ray.setFromCamera(ptr, camera);
+  if (retoActivo){ const h = ray.intersectObject(mar)[0] || ray.intersectObject(terreno)[0]; if (h) resolverReto(h.point); return; }
+  const hit = ray.intersectObject(terreno)[0];
+  if (!hit) return;
+  let mejor=null, md=1e9;
+  vols.forEach((v,q)=>{ const e=estados[q]; if (e.edad<0||e.h<1) return; const d=Math.hypot(hit.point.x-e.x, hit.point.z-v.z)/v.w; if (d<1.6 && d<md){md=d;mejor=q;} });
+  if (mejor===null){ $('info').classList.add('hidden'); sel=null; return; }
+  sel = mejor; mostrarInfo(); tono(700,.06,'sine',.06);
+});
+function mostrarInfo(){
+  if (sel===null) return;
+  const v=vols[sel], e=estados[sel], et=etapaDe(v,e,t);
+  const alt = Math.round(e.cima*M_POR_U/10)*10;
+  const altTxt = alt>=0 ? `Cima a ${alt.toLocaleString('es')} m sobre el mar` : `Cima a ${(-alt).toLocaleString('es')} m bajo el mar`;
+  const edad = e.edad < .1 ? 'menos de 100 mil años' : e.edad.toLocaleString('es',{maximumFractionDigits:1}) + ' millones de años';
+  $('info').innerHTML = `<button class="x" onclick="this.parentNode.classList.add('hidden')">×</button><b>${v.n}</b><br>Edad: ${edad}<br>${altTxt}<br><span style="color:#ffb27a">${et?NOMBRE_ETAPA[et]:''}</span>`;
+  $('info').classList.remove('hidden');
+}
+
+/* ---------- Preguntas (todo sale de la lámina) ---------- */
+const PREGUNTAS = [
+  { titulo:'¡Nació Kauaʻi!', dato:'Kauaʻi salió del mar hace unos 5 millones de años. Hawái está en medio de la placa del Pacífico, lejos de los bordes de placa.',
+    p:'Entonces, ¿por qué hay volcanes aquí?', o:['Por un punto caliente en el manto','Porque dos placas chocan (subducción)','Por una falla transformante'], c:0,
+    exp:'Es <b>volcanismo intraplaca</b>: un punto caliente alimenta los volcanes desde el manto. Aquí no hay subducción.' },
+  { titulo:'¡Nació Oʻahu!', dato:'Kauaʻi ya se alejó del punto caliente y dejó de crecer. Ahora nace Oʻahu, más al sureste.',
+    p:'¿Cómo sube la roca caliente desde el manto?', o:['Por radiación','Por convección','Por conducción'], c:1,
+    exp:'Por <b>convección</b>: la roca caliente es menos densa y sube; la fría baja. Así se forma la pluma del manto.' },
+  { titulo:'¡Nació Maui!', dato:'Cada isla nueva aparece en el mismo lugar: justo encima del punto caliente.',
+    p:'¿Qué es lo que se mueve?', o:['El punto caliente se mueve y la placa se queda fija','La placa se mueve y el punto caliente se queda fijo','Los dos se quedan quietos'], c:1,
+    exp:'La <b>placa del Pacífico</b> avanza al noroeste y el <b>punto caliente</b> se queda casi fijo. Por eso las islas forman una cadena.' },
+  { titulo:'¡Nació la Isla de Hawái!', dato:'Es la isla más joven: tiene menos de 1 millón de años y todavía crece. Está en la etapa de escudo.',
+    p:'¿De qué roca está hecha casi toda Hawái?', o:['Granito','Mármol','Basalto'], c:2,
+    exp:'De <b>basalto</b>: una roca <b>ígnea</b> oscura que se forma cuando la lava se enfría rápido.' },
+  { titulo:'Una isla está naciendo', dato:'<b>Kamaʻehuakanaloa</b> es un volcán submarino activo. Su cima está a unos 975 m bajo el mar. Algún día podría ser una nueva isla.',
+    p:'¿Por qué la roca del manto se funde al llegar a la litosfera?', o:['Porque baja la presión','Porque el agua del océano la calienta','Porque sube la presión'], c:0,
+    exp:'Al subir, la <b>presión baja</b> y la roca se funde aunque casi no cambie su temperatura. Así nace el <b>magma</b>.' },
+  { titulo:'Llegamos a hoy', dato:'Mira la cadena: la isla más vieja tiene vegetación y está desgastada; la más joven todavía echa lava.',
+    p:'¿Hacia dónde son más viejas las islas?', o:['Hacia el sureste','Hacia el noroeste','Todas tienen la misma edad'], c:1,
+    exp:'Hacia el <b>noroeste</b>: Kauaʻi tiene unos 5 millones de años y la Isla de Hawái menos de 1 millón.' },
+];
+function mezclar(a){ const r=a.map((x,i)=>i); for(let i=r.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[r[i],r[j]]=[r[j],r[i]];} return r; }
+function preguntar(i, alTerminar){
+  const P = PREGUNTAS[i]; enPregunta = true; const seguir = corriendo; setPlay(false);
+  const orden = mezclar(P.o);
+  $('cPreg').innerHTML = `<div class="kick">Pregunta ${i+1} de ${PREGUNTAS.length}</div><h2>${P.titulo}</h2><div class="dato">${P.dato}</div>
+    <div class="preg">${P.p}</div>${orden.map(k=>`<button class="opc" data-k="${k}">${P.o[k]}</button>`).join('')}<div class="fb" id="fb"></div>
+    <button class="go hidden" id="bSeguir">${i===PREGUNTAS.length-1?'Ver resultado':'Seguir'}</button>`;
+  $('mPreg').classList.remove('hidden');
+  tono(330,.25,'sine',.12,660);
+  $('cPreg').querySelectorAll('.opc').forEach(b=>b.onclick=()=>{
+    const k=+b.dataset.k, ok = k===P.c;
+    $('cPreg').querySelectorAll('.opc').forEach(x=>{ x.disabled=true; if (+x.dataset.k===P.c) x.classList.add('ok'); });
+    if (!ok) b.classList.add('bad');
+    if (ok){ aciertos++; puntos += 100; tono(660,.12,'triangle',.15); setTimeout(()=>tono(990,.18,'triangle',.15),110); }
+    else tono(220,.3,'sawtooth',.08,150);
+    $('puntos').textContent = puntos+' pts';
+    $('fb').className = 'fb '+(ok?'ok':'bad'); $('fb').innerHTML = (ok?'¡Correcto! ':'Casi. ') + P.exp;
+    const bs=$('bSeguir'); bs.classList.remove('hidden');
+    bs.onclick=()=>{ $('mPreg').classList.add('hidden'); enPregunta=false; if (alTerminar) alTerminar(); else setPlay(seguir || true); };
+  });
+}
+function fin(){
+  terminado = true; setPlay(false);
+  const n = PREGUNTAS.length+1, est = aciertos===n?3: aciertos>=n-2?2: aciertos>=2?1:0;
+  const msj = ['¡Sigue intentando!','¡Bien hecho!','¡Muy bien!','¡Perfecto! Eres experto en puntos calientes.'][est];
+  $('cFin').innerHTML = `<div class="kick">Resultado</div><h1>${msj}</h1><div class="estrellas">${'★'.repeat(est)}${'☆'.repeat(3-est)}</div>
+    <p><b>${aciertos} de ${n}</b> retos correctos · ${puntos} puntos</p>
+    <div class="dato">En 5,6 millones de años, la placa del Pacífico se movió sobre el punto caliente y formó una cadena de islas. Con muchos millones de años más, las islas viejas se desgastan y se hunden. Si un arrecife de coral crece alrededor mientras la isla se hunde, puede quedar un <b>atolón</b>.</div>
+    <button class="go lava" id="bOtra">Jugar otra vez</button>
+    <button class="go" id="bLibre">Explorar libre</button>
+    <p class="nota">Fuentes: USGS, National Park Service y Smithsonian Global Volcanism Program.</p>`;
+  $('mFin').classList.remove('hidden');
+  tono(523,.15,'triangle',.14); setTimeout(()=>tono(659,.15,'triangle',.14),150); setTimeout(()=>tono(784,.3,'triangle',.14),300);
+  $('bOtra').onclick = ()=>{ $('mFin').classList.add('hidden'); reiniciar(); };
+  $('bLibre').onclick = ()=>{ $('mFin').classList.add('hidden'); };
+}
+function reiniciar(){
+  t = T0; puntos = 0; aciertos = 0; terminado = false; $('puntos').textContent='0 pts';
+  vols.forEach(v=>{ v.emergio=false; v.salio=false; v.erosiono=false; v.preg=false; });
+  rejuvAvisado=false; kamaPreg=false; retoHecho=false; retoActivo=false; marca.visible=false; pin.visible=false; sel=null; $('info').classList.add('hidden');
+  actualizarTerreno(t,true); setPlay(true);
+}
+
+/* ---------- Reto: ¿dónde nacerá la próxima isla? ---------- */
+const T_RETO = -2.0;
+let retoHecho = false, retoActivo = false;
+function iniciarReto(){
+  retoHecho = true; retoActivo = true; setPlay(false); enPregunta = true;
+  if (verCorte) alternarCorte();
+  $('info').classList.add('hidden');
+  const port = innerWidth < innerHeight;
+  volarA(new THREE.Vector3(10, port?190:150, port?120:95), new THREE.Vector3(10, 0, 0), 1.2);
+  $('reto').innerHTML = 'Reto: toca el mar donde crees que nacerá la próxima isla<small>Pista: mira dónde está el volcán más joven y hacia dónde va la placa.</small>';
+  $('reto').classList.remove('hidden'); $('toast').classList.remove('show');
+  tono(392,.2,'triangle',.12,523);
+}
+function resolverReto(p){
+  retoActivo = false; $('reto').classList.add('hidden');
+  const d = Math.hypot(p.x-HX, p.z-HZ);
+  pin.position.set(p.x, MAR+3, p.z); pin.visible = true;
+  marca.visible = true; marcaHasta = uT.value + 6;
+  let txt, gana = 0;
+  if (d < 20){ gana = 150; aciertos++; txt = '<b>¡Exacto!</b> +150. Las islas nuevas nacen encima del <b>punto caliente</b> (círculo naranja), al sureste de las demás.'; tono(660,.12,'triangle',.15); setTimeout(()=>tono(990,.2,'triangle',.15),110); }
+  else if (d < 40){ gana = 60; txt = '<b>¡Cerca!</b> +60. El punto caliente es el círculo naranja: ahí nacen las islas nuevas.'; tono(520,.15,'triangle',.12); }
+  else { txt = 'No es ahí. El punto caliente es el círculo naranja: las islas nuevas nacen al <b>sureste</b>, porque la placa se lleva las viejas al noroeste.'; tono(220,.3,'sawtooth',.08,150); }
+  puntos += gana; $('puntos').textContent = puntos+' pts';
+  aviso(txt, 6);
+  setTimeout(()=>{ enPregunta = false; pin.visible = false; volarA(camNormal.pos.clone(), camNormal.tgt.clone()); setPlay(true); }, 3500);
+}
+
+/* ---------- Eventos del tiempo ---------- */
+let rejuvAvisado=false, kamaPreg=false;
+function revisarEventos(){
+  for (let q=0;q<vols.length;q++){
+    const v=vols[q], e=estados[q];
+    if (!v.sub && !v.emergio && e.edad>=0 && e.cima > MAR+.3){
+      v.emergio = true; sel = q; tono(110,.6,'sine',.2,55);
+      if (v.q!==undefined && !v.preg){ v.preg=true; preguntar(v.q); return; }
+      else aviso(`<b>¡Nació ${v.n}!</b> Salió del mar sobre el punto caliente.`);
+    }
+    if (v.emergio && !v.salio && !e.activo){ v.salio=true; aviso(`<b>${v.n}</b> se aleja del punto caliente: <b>post-escudo</b>. Sale menos lava.`); }
+    if (v.emergio && !v.erosiono && e.ero > .25 && v.n!=='Niʻihau'){ v.erosiono=true; aviso(`<b>${v.n}</b> se apagó: <b>erosión y hundimiento</b>. La lluvia y el oleaje la desgastan.`); }
+  }
+  if (!retoHecho && t >= T_RETO){ iniciarReto(); return; }
+  if (!rejuvAvisado && t >= REJUV.t){ rejuvAvisado=true; aviso('<b>Rejuvenecimiento en Oʻahu:</b> una erupción pequeña, como la que formó Diamond Head.', 5); }
+  const kama = vols.find(v=>v.sub), ek = estados[vols.indexOf(kama)];
+  if (!kamaPreg && ek.edad > .1){ kamaPreg=true; sel=vols.indexOf(kama); preguntar(kama.q); return; }
+  if (t >= T1 && !terminado && !enPregunta){ preguntar(5, fin); }
+}
+
+/* ---------- Bucle ---------- */
+const reloj = new THREE.Clock();
+let retumbo = 0;
+function bucle(){
+  requestAnimationFrame(bucle);
+  const dt = Math.min(.05, reloj.getDelta());
+  uT.value += dt;
+  let cambio = false;
+  if (corriendo && !enPregunta && !terminado){
+    t = Math.min(T1, t + dt*vel/SEG_POR_MA); cambio = true;
+  }
+  frameN++;
+  const hayLava = estados.some((e,q)=>e.activo && e.edad>=0);
+  if (cambio || frameN<3 || (hayLava && frameN%2===0)) actualizarTerreno(t, cambio ? frameN%2===0 : false);
+  if (cambio) { revisarEventos(); if (sel!==null && !$('info').classList.contains('hidden')) mostrarInfo(); }
+
+  // tiempo y etapa
+  $('tTxt').textContent = fmtT(t);
+  let foco = sel;
+  if (foco===null){ for (let q=vols.length-1;q>=0;q--) if (estados[q] && estados[q].edad>=0 && !vols[q].sub){ foco=q; break; } }
+  if (foco!==null && estados[foco]){
+    const et = etapaDe(vols[foco], estados[foco], t);
+    $('etapasNombre').innerHTML = `<b>${vols[foco].n}</b> · ${et?NOMBRE_ETAPA[et]:''}`;
+    document.querySelectorAll('#etapas span').forEach(s=>s.classList.toggle('on', s.dataset.e===et));
+  }
+
+  // volcán en erupción (sobre el mar) y submarino
+  let erup = null, subm = null;
+  vols.forEach((v,q)=>{ const e=estados[q]; if (!e||e.edad<0) return; const tp=v.tB+v.crece;
+    if (e.activo){ if (e.cima>MAR) erup={v,e}; else subm={v,e}; }
+    else if (!erup && t-tp < .3 && e.cima>MAR && !v.sub) erup={v,e,chico:true,post:true}; });
+  const rj = rejuvEstado(t); if (!erup && rj && rj.activo) erup = { v:{z:rj.z, w:2}, e:{x:rj.x, cima:rj.h+1} , chico:true };
+  if (erup){
+    const cx=erup.e.x, cz=erup.v.z, cy=Math.max(MAR,erup.e.cima)+.3;
+    brillo.visible=true; brillo.position.set(cx,cy+.6,cz); const s=(erup.chico?5:10)*(1+.08*Math.sin(uT.value*9)); brillo.scale.set(s,s,1);
+    luzLava.position.set(cx,cy+3,cz); luzLava.intensity = (erup.chico?250:700)*(.85+.15*Math.sin(uT.value*11));
+    // humo
+    if (Math.random()<.5){ const h=humos.find(h=>!h.visible); if(h){ h.visible=true; h.userData={vida:0, vx:.6+Math.random()*.5, vz:(Math.random()-.5)*.4, vy:2.2+Math.random()}; h.position.set(cx+(Math.random()-.5)*2,cy+1,cz+(Math.random()-.5)*2); } }
+    // chispas
+    for (let k=0;k<4;k++){ const i=Math.floor(Math.random()*NS); if (chL[i]<=0){ chL[i]=1+Math.random()*.6; chP.set([cx,cy,cz],i*3); chV.set([(Math.random()-.5)*5,6+Math.random()*7,(Math.random()-.5)*5],i*3);} }
+    retumbo = Math.min(1, retumbo + dt*.8);
+  } else { brillo.visible=false; luzLava.intensity=0; retumbo = Math.max(0, retumbo - dt*.6); }
+  if (gRetumbo) gRetumbo.gain.value = retumbo*.55;
+  humos.forEach(h=>{ if(!h.visible) return; const u=h.userData; u.vida+=dt*.28; h.position.x+=u.vx*dt*3; h.position.y+=u.vy*dt*3; h.position.z+=u.vz*dt*3; const s=3+u.vida*14; h.scale.set(s,s,1); h.material.opacity = Math.max(0,.75*(1-u.vida))*Math.min(1,u.vida*5); if(u.vida>=1) h.visible=false; });
+  for (let i=0;i<NS;i++){ if (chL[i]>0){ chL[i]-=dt; chV[i*3+1]-=14*dt; chP[i*3]+=chV[i*3]*dt; chP[i*3+1]+=chV[i*3+1]*dt; chP[i*3+2]+=chV[i*3+2]*dt; if (chL[i]<=0) chP[i*3+1]=-999; } }
+  chG.attributes.position.needsUpdate = true;
+  // burbujas sobre volcanes submarinos
+  for (let i=0;i<NB;i++){
+    if (buL[i]>0){ buP[i*3+1]+=dt*(3+(i%5)); buL[i]-=dt; if (buP[i*3+1]>MAR-.1||buL[i]<=0){ buL[i]=0; buP[i*3+1]=-999; } }
+    else if (subm && Math.random()<.04){ buL[i]=4; buP.set([subm.e.x+(Math.random()-.5)*2, subm.e.cima+.3, subm.v.z+(Math.random()-.5)*2], i*3); }
+  }
+  buG.attributes.position.needsUpdate = true;
+
+  if (marca.visible){ const k=1+.06*Math.sin(uT.value*5); marca.scale.set(k,k,1); if (uT.value>marcaHasta) marca.visible=false; }
+  // océano
+  olas.offset.x += dt*.012; olas.offset.y += dt*.008; olas2.offset.x -= dt*.006; olas2.offset.y += dt*.01;
+
+  // interior
+  if (verCorte){
+    actualizarCortina(t);
+    texLito.offset.x = (V*t)/((X_MAX-X_MIN)/5);
+    for (let i=0;i<NG;i++){
+      gVida[i]-=dt*.35; if (gVida[i]<=0) gVida[i]=1;
+      const s=1-gVida[i];
+      const destino = erup ? erup.e.x : (subm ? subm.e.x : HX-6);
+      const x0 = HX-8+((i*37)%17-8)*.6, y0 = LITO_BOT+2;
+      const yTop = FONDO - 1;
+      gPos.set([x0+(destino-x0)*s*s + Math.sin(i+uT.value)*.3, y0+(yTop-y0)*s, ZC+.3], i*3);
+    }
+    gotasG.attributes.position.needsUpdate = true;
+    const act = erup || subm;
+    if (act && !act.post && !(act.chico && !act.v.n)){ const top = act.e.cima, bot = FONDO-1; conducto.visible = true; conducto.position.set(act.e.x, (top+bot)/2, ZC+.1); conducto.scale.y = Math.max(1, top-bot); }
+    else conducto.visible = false;
+    capas.forEach(c=>proyectar(c.p(), c.el));
+  }
+
+  // etiquetas de islas
+  vols.forEach((v,q)=>{ const e=estados[q], el=labIsla[q];
+    const ver = e && e.edad>=0 && (e.cima>MAR+.2 || (v.sub && e.edad>.05)) && !verCorte;
+    if (!ver){ el.style.display='none'; return; }
+    el.textContent = v.n + (v.sub?' (bajo el mar)':'');
+    proyectar(new THREE.Vector3(e.x, Math.max(MAR,e.cima)+2.5, v.z), el); });
+
+  // vuelo de cámara
+  if (anim){ anim.s = Math.min(1, anim.s + dt/anim.dur); const k = anim.s<.5?2*anim.s*anim.s:1-Math.pow(-2*anim.s+2,2)/2;
+    camera.position.lerpVectors(anim.p0, anim.p1, k); controls.target.lerpVectors(anim.t0, anim.t1, k); if (anim.s>=1) anim=null; }
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); encuadreNormal(); });
+
+actualizarTerreno(t, true);
+$('cargando').remove();
+bucle();
+$('bJugar').onclick = ()=>{ iniciarAudio(); $('mInicio').classList.add('hidden'); setPlay(true); tono(440,.15,'triangle',.12,880);
+  aviso('La <b>placa del Pacífico</b> se mueve hacia el noroeste (izquierda). El <b>punto caliente</b> se queda fijo.', 5); };
+window.__juego = { get t(){return t;}, set t(v){t=v;}, estados:()=>estados, vols };
+</script>
+<noscript>Este juego necesita JavaScript.</noscript>
+</body>
+</html>
