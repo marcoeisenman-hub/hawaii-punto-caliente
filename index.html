@@ -196,7 +196,7 @@ function estado(v, t){
   let h, sink=0, ero=0;
   if (t <= tp){ const s=(t-v.tB)/v.crece; h = v.H * (s*s*(3-2*s)); }
   else { const a=t-tp; h = Math.max(0, v.H - v.ero*a); sink = v.sink*a; ero = Math.min(1, a/3); }
-  return { x, h, sink, ero, activo: t < tp, edad: t - v.tB, cima: FONDO + h - sink };
+  return { x, h, sink, ero, activo: t < tp || tp >= T1 - .01, edad: t - v.tB, cima: FONDO + h - sink };  // los que siguen activos hoy no se apagan
 }
 function etapaDe(v, e, t){
   if (e.edad < 0) return null;
