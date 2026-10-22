@@ -675,7 +675,8 @@ function setPlay(on){ corriendo = on; $('bPlay').innerHTML = on?ICON.pausa:ICON.
 setPlay(false);
 $('bSon').innerHTML = ICON.son;
 $('bPlay').onclick = ()=>{ iniciarAudio(); if (terminado) return; setPlay(!corriendo); tono(520,.08,'triangle',.08); };
-$('bVel').onclick = ()=>{ vel = vel===1?3:1; $('bVel').textContent='x'+vel; $('bVel').classList.toggle('on', vel===3); tono(660,.08,'triangle',.08); };
+const VELS=[1,3,5,7];
+$('bVel').onclick = ()=>{ vel = VELS[(VELS.indexOf(vel)+1)%VELS.length]; $('bVel').textContent='x'+vel; $('bVel').classList.toggle('on', vel>1); tono(660,.08,'triangle',.08); };
 $('bSon').onclick = ()=>{ sonido=!sonido; $('bSon').innerHTML = sonido?ICON.son:ICON.mudo; if (master) master.gain.value = sonido?1:0; };
 $('bCorte').onclick = ()=>{ alternarCorte(); tono(440,.1,'triangle',.08); };
 
