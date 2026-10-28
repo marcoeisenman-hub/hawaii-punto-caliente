@@ -35,7 +35,7 @@ for cx in (700*S-330*S,700*S+330*S):
     d.polygon([(cx-40*S,MAR-6*S),(cx-20*S,MAR-14*S),(cx+25*S,MAR-12*S),(cx+40*S,MAR-6*S)],fill=(70,120,50))
 d.rectangle([700*S-240*S,MAR+2*S,700*S+240*S,MAR+60*S],fill=(80,190,190))   # laguna turquesa
 # 2 guyot: cima plana bajo el mar
-g=volcan(2000*S,430*S,MAR+125*S); g=[(x,max(y,MAR+125*S)) for x,y in g]; poly(g,(92,80,70))
+g=volcan(2000*S,430*S,MAR+20*S); g=[(x,max(y,MAR+125*S)) for x,y in g]; poly(g,(92,80,70))
 # 3 isla erosionada: verde con valles y tierra roja
 e=volcan(3350*S,470*S,MAR-120*S,rug=34,seed=1.3); poly(e,(88,76,66))
 dent=[(x,y) for x,y in e if y<MAR]
